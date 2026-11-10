@@ -1,75 +1,14 @@
-/* Theme tokens. Each [data-theme] is one visual direction for review. */
-:root,
-:root[data-theme='clay'] {
+/* Clay style tokens. Further design direction comes later. */
+:root {
   --bg: #eef0ed;
   --sheet: #ffffff;
   --ink: #161a18;
   --muted: #58605b;
   --line: #dde1dd;
-  --card: #f4f5f3;
   --accent: #18794a;
   --accent-ink: #ffffff;
-  --btn: #161a18;
-  --btn-ink: #ffffff;
-  --font-head: 'Hanken Grotesk Variable', system-ui, sans-serif;
   --font-body: 'Hanken Grotesk Variable', system-ui, sans-serif;
-  --font-arabic: 'Noto Naskh Arabic Variable', 'Amiri', serif;
-  --head-weight: 640;
-  --head-track: -0.025em;
-  --r-sheet: 22px;
-  --r-card: 14px;
-  --r-btn: 999px;
-  --sheet-gap: 0px;
-  --sheet-shadow: 0 -1px 0 var(--line);
-  --band: 0px;
-}
-
-:root[data-theme='kiswah'] {
-  --bg: #f3efe6;
-  --sheet: #000000;
-  --ink: #f6f0e1;
-  --muted: #b9ae95;
-  --line: #2d281c;
-  --card: #12100a;
-  --accent: #d2ac57;
-  --accent-ink: #000000;
-  --btn: #d2ac57;
-  --btn-ink: #000000;
-  --font-head: 'Young Serif', Georgia, serif;
-  --font-body: 'Figtree Variable', system-ui, sans-serif;
-  --font-arabic: 'Amiri', 'Noto Naskh Arabic Variable', serif;
-  --head-weight: 400;
-  --head-track: -0.01em;
-  --r-sheet: 0px;
-  --r-card: 2px;
-  --r-btn: 2px;
-  --sheet-gap: 0px;
-  --sheet-shadow: none;
-  --band: 7px;
-}
-
-:root[data-theme='fajr'] {
-  --bg: #d6e2eb;
-  --sheet: #f3f8fc;
-  --ink: #0e2337;
-  --muted: #435970;
-  --line: #c8d8e5;
-  --card: #e5eef6;
-  --accent: #a85200;
-  --accent-ink: #ffffff;
-  --btn: #0e2337;
-  --btn-ink: #ffffff;
-  --font-head: 'Bricolage Grotesque Variable', system-ui, sans-serif;
-  --font-body: 'Atkinson Hyperlegible', system-ui, sans-serif;
-  --font-arabic: 'IBM Plex Sans Arabic', 'Noto Naskh Arabic Variable', sans-serif;
-  --head-weight: 700;
-  --head-track: -0.035em;
-  --r-sheet: 30px;
-  --r-card: 20px;
-  --r-btn: 16px;
-  --sheet-gap: 10px;
-  --sheet-shadow: 0 18px 40px -18px rgba(14, 35, 55, 0.45);
-  --band: 0px;
+  --font-arabic: 'Noto Naskh Arabic Variable', serif;
 }
 
 * {
@@ -93,6 +32,17 @@ body {
   overflow: hidden;
 }
 
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -102,17 +52,21 @@ body {
   white-space: nowrap;
 }
 
+/* Mobile-first: one column. Wider screens just centre the same layout. */
 .app {
   height: 100dvh;
+  max-width: 520px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
 }
 
-/* 3D stage */
+/* Map */
 .stage {
   position: relative;
   flex: 1 1 auto;
-  min-height: 38dvh;
+  min-height: 0;
+  overflow: hidden;
   background: var(--bg);
 }
 
@@ -125,45 +79,181 @@ body {
   touch-action: none;
 }
 
-.styles {
-  position: absolute;
-  top: calc(12px + env(safe-area-inset-top));
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 2px;
-  margin: 0;
-  padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-btn);
-  background: var(--sheet);
-}
-
-.styles label {
-  position: relative;
-  padding: 7px 16px;
-  border-radius: var(--r-btn);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.styles label.is-on {
-  background: var(--btn);
-  color: var(--btn-ink);
-}
-
-.styles input {
+.pins {
   position: absolute;
   inset: 0;
-  opacity: 0;
-  cursor: pointer;
+  pointer-events: none;
 }
 
-.styles label:has(input:focus-visible) {
+/* Each pin is a 44px tap target whose bottom centre is the map point.
+   The badge sits at the top with a short stem down to the point. */
+.pin,
+.place {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  will-change: transform;
+}
+
+.place {
+  width: 0;
+  height: 0;
+}
+
+.pin {
+  width: 44px;
+  height: 44px;
+  margin: -44px 0 0 -22px;
+  pointer-events: auto;
+}
+
+.pin-badge {
+  position: absolute;
+  left: 7px;
+  top: 4px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--sheet);
+  border: 2px solid var(--ink);
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(22, 26, 24, 0.25);
+}
+
+/* Stem */
+.pin::before {
+  content: '';
+  position: absolute;
+  left: 21px;
+  bottom: 0;
+  width: 2px;
+  height: 10px;
+  background: var(--ink);
+}
+
+.pin.is-on .pin-badge {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.pin.is-on::before {
+  background: var(--accent);
+}
+
+.pin:focus-visible {
+  outline: none;
+}
+
+.pin:focus-visible .pin-badge {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
+}
+
+.place span {
+  position: absolute;
+  left: 12px;
+  top: -9px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sheet) 80%, transparent);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.miqat {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 14px 6px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--sheet);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.miqat-nums {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.miqat-nums i {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  font-style: normal;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.miqat.is-on .miqat-nums i {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.map-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 44px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sheet);
+  overflow: hidden;
+}
+
+.map-controls button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+}
+
+.map-controls button:first-child {
+  border-top: 0;
+}
+
+.map-controls button:focus-visible {
+  outline-offset: -3px;
+}
+
+.map-controls svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tilt-label {
+  font-weight: 700;
+  font-size: 14px;
 }
 
 .notice {
@@ -171,53 +261,30 @@ body {
   left: 12px;
   bottom: 12px;
   margin: 0;
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-radius: 6px;
   background: color-mix(in srgb, var(--sheet) 88%, transparent);
   color: var(--muted);
   font-size: 12px;
 }
 
-/* Bottom sheet */
+/* Sheet */
 .sheet {
   flex: 0 0 auto;
-  max-height: 54dvh;
-  margin: 0 var(--sheet-gap) var(--sheet-gap);
-  overflow-y: auto;
   background: var(--sheet);
-  border-top: var(--band) solid var(--accent);
-  border-radius: var(--r-sheet) var(--r-sheet) calc(var(--r-sheet) * min(1, var(--sheet-gap) / 1px))
-    calc(var(--r-sheet) * min(1, var(--sheet-gap) / 1px));
-  box-shadow: var(--sheet-shadow);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -1px 0 var(--line);
 }
 
 .sheet-inner {
-  padding: 18px 20px 0;
-  max-width: 34rem;
-  margin: 0 auto;
+  padding: 18px 20px calc(18px + env(safe-area-inset-bottom));
 }
 
-.progress {
+.sheet-head {
   display: flex;
-  gap: 5px;
-  list-style: none;
-  margin: 0 0 16px;
-  padding: 0;
-}
-
-.progress li {
-  flex: 1;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--line);
-}
-
-.progress li.done {
-  background: color-mix(in srgb, var(--accent) 45%, var(--line));
-}
-
-.progress li.now {
-  background: var(--accent);
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .step-count {
@@ -228,165 +295,49 @@ body {
 
 h1 {
   margin: 2px 0 6px;
-  font-family: var(--font-head);
-  font-weight: var(--head-weight);
-  font-size: 2.25rem;
-  line-height: 1.08;
-  letter-spacing: var(--head-track);
+  font-weight: 640;
+  font-size: 1.625rem;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
 }
 
 .lede {
-  margin: 0 0 14px;
-  max-width: 32ch;
-  color: var(--ink);
+  margin: 0 0 16px;
+  min-height: 3em; /* two lines, so the sheet does not jump between steps */
 }
 
-.circuits {
+.stepper {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  font-size: 15px;
-  color: var(--muted);
+  justify-content: space-between;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
-.circuits b {
-  color: var(--ink);
-  font-weight: 700;
-}
-
-.circuit-dots {
-  display: inline-flex;
-  gap: 6px;
-}
-
-.circuit-dots i {
-  width: 12px;
-  height: 12px;
+.stepper button {
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  border: 1.5px solid var(--muted);
+  border: 2px solid var(--line);
+  background: var(--sheet);
+  font-weight: 700;
+  font-size: 16px;
 }
 
-.circuit-dots i.on {
+.stepper button.is-on {
   background: var(--accent);
   border-color: var(--accent);
-}
-
-.dua {
-  padding: 16px;
-  border-radius: var(--r-card);
-  background: var(--card);
-  border: 1px solid var(--line);
-}
-
-.dua-arabic {
-  margin: 0 0 12px;
-  font-family: var(--font-arabic);
-  font-size: 1.55rem;
-  line-height: 2.05;
-  color: var(--ink);
-}
-
-.dua-meaning {
-  margin: 0 0 10px;
-  font-size: 15px;
-}
-
-.dua-source {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.dua-source a {
-  color: var(--accent);
-  font-weight: 600;
-  text-underline-offset: 3px;
-}
-
-.step-nav {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  gap: 10px;
-  margin: 0 -20px;
-  padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
-  background: var(--sheet);
+  color: var(--accent-ink);
 }
 
 .btn {
-  min-height: 48px;
-  padding: 0 18px;
-  border-radius: var(--r-btn);
-  border: 1.5px solid transparent;
-  font: inherit;
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: transparent;
   font-weight: 650;
   font-size: 15px;
-  line-height: 1.2;
-  cursor: pointer;
-}
-
-.btn.primary {
-  flex: 1;
-  background: var(--btn);
-  color: var(--btn-ink);
-}
-
-.btn.ghost {
-  background: transparent;
-  color: var(--ink);
-  border-color: var(--line);
-}
-
-.btn:focus-visible,
-a:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* Desktop: the sheet becomes a side panel over a full-bleed city. */
-@media (min-width: 900px) {
-  .app {
-    display: block;
-    position: relative;
-  }
-
-  .stage {
-    position: absolute;
-    inset: 0;
-  }
-
-  .styles {
-    left: auto;
-    right: 24px;
-    top: 24px;
-    transform: none;
-  }
-
-  .notice {
-    left: auto;
-    right: 24px;
-    bottom: 24px;
-  }
-
-  .sheet {
-    position: absolute;
-    top: 24px;
-    left: 24px;
-    bottom: 24px;
-    width: 420px;
-    max-height: none;
-    margin: 0;
-    border-radius: var(--r-sheet);
-    box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.35);
-  }
-
-  .sheet-inner {
-    padding: 28px 28px 0;
-  }
-
-  .step-nav {
-    margin: 0 -28px;
-    padding: 16px 28px 24px;
-  }
+  white-space: nowrap;
 }

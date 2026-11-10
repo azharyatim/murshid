@@ -1,10 +1,17 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { SceneTheme } from '../themes';
+import { MARWA, SAFA } from '../data/steps';
 import { generateSampleCity, type Box } from './sampleCity';
 
 const NODE_COUNT = 150;
 const MATAF_RADIUS = 68;
+const MIN_DISTANCE = 160;
+const MAX_DISTANCE = 2600;
+const MIN_POLAR = 0.02; // straight down
+const MAX_POLAR = 1.3; // close to the horizon
+const AERIAL_POLAR = 0.4;
+const TILTED_POLAR = 1.0;
 
 interface TawafNode {
   radius: number;
@@ -12,14 +19,29 @@ interface TawafNode {
   speed: number; // radians per second
 }
 
+/** An HTML element pinned to a point in the 3D scene. */
+export interface Pin {
+  el: HTMLElement;
+  /** Metres from the Kaabah: x = east, z = south. */
+  pos: [number, number];
+}
+
+interface Flight {
+  fromPos: THREE.Vector3;
+  toPos: THREE.Vector3;
+  fromTarget: THREE.Vector3;
+  toTarget: THREE.Vector3;
+  t: number;
+}
+
 /**
- * The white-clay city scene. Stage 1 renders a placeholder city around a
- * simplified massing of Masjid al-Haram so the visual styles can be compared.
+ * The white-clay city scene: a placeholder city around a simplified massing
+ * of Masjid al-Haram. The camera can be zoomed, rotated, tilted and panned.
  */
 export class CityScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(32, 1, 10, 4000);
+  private camera = new THREE.PerspectiveCamera(32, 1, 10, 6000);
   private controls: OrbitControls;
   private sun = new THREE.DirectionalLight(0xffffff, 2.6);
   private sky = new THREE.HemisphereLight(0xffffff, 0xdddddd, 1.2);
@@ -29,20 +51,28 @@ export class CityScene {
     building: new THREE.MeshStandardMaterial({ roughness: 0.95 }),
     haram: new THREE.MeshStandardMaterial({ roughness: 0.9 }),
     kaabah: new THREE.MeshStandardMaterial({ roughness: 0.85 }),
-    band: new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.3 }),
     node: new THREE.MeshBasicMaterial(),
   };
-  private band: THREE.Mesh;
   private nodes: TawafNode[] = [];
   private nodeMesh: THREE.InstancedMesh;
   private dummy = new THREE.Object3D();
+  private pins: Pin[] = [];
+  private overview: { center: THREE.Vector3; radius: number };
+  private flight: Flight | null = null;
   private raf = 0;
   private last = 0;
   private needsRender = true;
   private reducedMotion: boolean;
   private resizeObserver: ResizeObserver;
+  private tmp = new THREE.Vector3();
 
-  constructor(private canvas: HTMLCanvasElement, theme: SceneTheme, reducedMotion: boolean) {
+  constructor(
+    private canvas: HTMLCanvasElement,
+    theme: SceneTheme,
+    reducedMotion: boolean,
+    /** Points that the default aerial view must keep in frame. */
+    overviewPoints: [number, number][],
+  ) {
     this.reducedMotion = reducedMotion;
     const small = Math.min(window.innerWidth, window.innerHeight) < 700;
 
@@ -57,18 +87,18 @@ export class CityScene {
     const size = small ? 1024 : 2048;
     this.sun.shadow.mapSize.set(size, size);
     const sc = this.sun.shadow.camera;
-    sc.left = -1150;
-    sc.right = 1150;
-    sc.top = 1150;
-    sc.bottom = -1150;
+    sc.left = -1250;
+    sc.right = 1250;
+    sc.top = 1250;
+    sc.bottom = -1250;
     sc.near = 100;
-    sc.far = 2200;
+    sc.far = 2400;
     this.sun.shadow.bias = -0.0006;
     this.sun.shadow.normalBias = 1.2;
     this.scene.add(this.sun, this.sky);
 
     // Ground (roads and open space).
-    const ground = new THREE.Mesh(new THREE.CircleGeometry(2600, 64), this.mats.ground);
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(4000, 64), this.mats.ground);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.scene.add(ground);
@@ -84,10 +114,6 @@ export class CityScene {
     kaabah.rotation.y = 0.5;
     kaabah.castShadow = true;
     this.scene.add(kaabah);
-    this.band = new THREE.Mesh(new THREE.BoxGeometry(11.25, 1.4, 12.75), this.mats.band);
-    this.band.position.y = 9.2;
-    this.band.rotation.y = 0.5;
-    this.scene.add(this.band);
 
     // Travelling nodes circling the Kaabah anticlockwise.
     this.nodeMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1.7, 10, 8), this.mats.node, NODE_COUNT);
@@ -103,19 +129,37 @@ export class CityScene {
     this.placeNodes();
     this.scene.add(this.nodeMesh);
 
+    // Frame for the default aerial view.
+    const box = new THREE.Box3();
+    overviewPoints.forEach(([x, z]) => box.expandByPoint(new THREE.Vector3(x, 0, z)));
+    const sphere = box.getBoundingSphere(new THREE.Sphere());
+    this.overview = { center: sphere.center, radius: sphere.radius };
+
+    // Touch: one finger rotates and tilts, two fingers pinch to zoom and drag to move.
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
-    this.controls.enablePan = false;
-    this.controls.minDistance = 220;
-    this.controls.maxDistance = 2200;
-    this.controls.minPolarAngle = 0.25;
-    this.controls.maxPolarAngle = 1.25;
-    this.controls.target.set(0, 0, 0);
-    this.controls.addEventListener('change', () => (this.needsRender = true));
+    this.controls.minDistance = MIN_DISTANCE;
+    this.controls.maxDistance = MAX_DISTANCE;
+    this.controls.minPolarAngle = MIN_POLAR;
+    this.controls.maxPolarAngle = MAX_POLAR;
+    this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+    this.controls.addEventListener('change', () => {
+      // Keep the view from being dragged away from the Haram area.
+      const t = this.controls.target;
+      const d = Math.hypot(t.x, t.z);
+      if (d > 700) {
+        t.x *= 700 / d;
+        t.z *= 700 / d;
+      }
+      t.y = 0;
+      this.needsRender = true;
+    });
+    this.controls.addEventListener('start', () => (this.flight = null));
 
     this.setTheme(theme);
-    this.resize(true);
-    this.resizeObserver = new ResizeObserver(() => this.resize(false));
+    this.resize();
+    this.showAll(false);
+    this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas.parentElement ?? canvas);
     this.raf = requestAnimationFrame(this.tick);
   }
@@ -138,7 +182,10 @@ export class CityScene {
     return mesh;
   }
 
-  /** Respectful simplified massing: a low ring around the open mataf. */
+  /**
+   * Respectful simplified massing: a low ring around the open mataf and a
+   * long gallery for the Mas'a between Safa and Marwa. Placeholder shapes.
+   */
   private buildHaram() {
     const ring = (outer: number, inner: number, sides: number) => {
       const shape = new THREE.Shape();
@@ -155,14 +202,13 @@ export class CityScene {
       return shape;
     };
     const tiers: [number, number, number][] = [
-      [185, MATAF_RADIUS, 15],
-      [172, MATAF_RADIUS + 12, 22],
+      [230, MATAF_RADIUS, 15],
+      [214, MATAF_RADIUS + 12, 22],
     ];
-    tiers.forEach(([outer, inner, depth], i) => {
+    tiers.forEach(([outer, inner, depth]) => {
       const geo = new THREE.ExtrudeGeometry(ring(outer, inner, 8), { depth, bevelEnabled: false, curveSegments: 48 });
       geo.rotateX(-Math.PI / 2);
       const mesh = new THREE.Mesh(geo, this.mats.haram);
-      mesh.position.y = i === 0 ? 0 : 0.01;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       this.scene.add(mesh);
@@ -173,12 +219,23 @@ export class CityScene {
     floor.receiveShadow = true;
     this.scene.add(floor);
 
+    // Mas'a gallery from Safa to Marwa.
+    const dx = MARWA[0] - SAFA[0];
+    const dz = MARWA[1] - SAFA[1];
+    const length = Math.hypot(dx, dz) + 40;
+    const masa = new THREE.Mesh(new THREE.BoxGeometry(40, 25, length), this.mats.haram);
+    masa.position.set((SAFA[0] + MARWA[0]) / 2, 12.5, (SAFA[1] + MARWA[1]) / 2);
+    masa.rotation.y = Math.atan2(dx, dz);
+    masa.castShadow = true;
+    masa.receiveShadow = true;
+    this.scene.add(masa);
+
     const minaretGeo = new THREE.CylinderGeometry(3.2, 4.2, 88, 10);
     minaretGeo.translate(0, 44, 0);
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
       const m = new THREE.Mesh(minaretGeo, this.mats.haram);
-      m.position.set(Math.cos(a) * 179, 0, Math.sin(a) * 179);
+      m.position.set(Math.cos(a) * 222, 0, Math.sin(a) * 222);
       m.castShadow = true;
       this.scene.add(m);
     }
@@ -195,14 +252,12 @@ export class CityScene {
 
   setTheme(t: SceneTheme) {
     this.scene.background = new THREE.Color(t.background);
-    this.scene.fog = new THREE.Fog(t.background, 1500, 3200);
+    this.scene.fog = new THREE.Fog(t.background, 1900, 4200);
     this.mats.ground.color.set(t.ground);
     this.mats.slab.color.set(t.slab);
     this.mats.building.color.set(t.building);
     this.mats.haram.color.set(t.haram);
     this.mats.kaabah.color.set(t.kaabah);
-    this.band.visible = t.kaabahBand !== null;
-    if (t.kaabahBand !== null) this.mats.band.color.set(t.kaabahBand);
     this.mats.node.color.set(t.node);
     this.sun.color.set(t.sun);
     this.sun.intensity = t.sunIntensity;
@@ -217,25 +272,94 @@ export class CityScene {
     this.needsRender = true;
   }
 
-  private resize(first: boolean) {
+  setPins(pins: Pin[]) {
+    this.pins = pins;
+    this.needsRender = true;
+  }
+
+  // Camera moves ------------------------------------------------------------
+
+  private flyTo(target: THREE.Vector3, distance: number, polar: number, azimuth: number, animate = true) {
+    const d = THREE.MathUtils.clamp(distance, MIN_DISTANCE, MAX_DISTANCE);
+    const p = THREE.MathUtils.clamp(polar, MIN_POLAR, MAX_POLAR);
+    const toPos = new THREE.Vector3(
+      target.x + d * Math.sin(p) * Math.sin(azimuth),
+      d * Math.cos(p),
+      target.z + d * Math.sin(p) * Math.cos(azimuth),
+    );
+    if (!animate || this.reducedMotion) {
+      this.flight = null;
+      this.camera.position.copy(toPos);
+      this.controls.target.copy(target);
+      this.controls.update();
+      this.needsRender = true;
+      return;
+    }
+    this.flight = {
+      fromPos: this.camera.position.clone(),
+      toPos,
+      fromTarget: this.controls.target.clone(),
+      toTarget: target.clone(),
+      t: 0,
+    };
+  }
+
+  private distance() {
+    return this.camera.position.distanceTo(this.controls.target);
+  }
+
+  /** The default aerial view: north up, every step pin in frame. */
+  showAll(animate = true) {
+    const vHalf = THREE.MathUtils.degToRad(this.camera.fov / 2);
+    const hHalf = Math.atan(Math.tan(vHalf) * this.camera.aspect);
+    const dist = (this.overview.radius * 1.22) / Math.sin(Math.min(vHalf, hHalf));
+    this.flyTo(this.overview.center.clone(), dist, AERIAL_POLAR, 0, animate);
+  }
+
+  /** Move in on one point, keeping the current compass direction. */
+  focus(pos: [number, number]) {
+    this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), 720, 0.75, this.controls.getAzimuthalAngle());
+  }
+
+  zoomBy(factor: number) {
+    this.flyTo(this.controls.target.clone(), this.distance() * factor, this.controls.getPolarAngle(), this.controls.getAzimuthalAngle());
+  }
+
+  rotateBy(radians: number) {
+    this.flyTo(this.controls.target.clone(), this.distance(), this.controls.getPolarAngle(), this.controls.getAzimuthalAngle() + radians);
+  }
+
+  /** Switch between looking straight down and a tilted 3D view. Returns true if now tilted. */
+  toggleTilt() {
+    const tilted = this.controls.getPolarAngle() > 0.6;
+    this.flyTo(this.controls.target.clone(), this.distance(), tilted ? MIN_POLAR : TILTED_POLAR, this.controls.getAzimuthalAngle());
+    return !tilted;
+  }
+
+  // Frame loop ----------------------------------------------------------------
+
+  private resize() {
     const parent = this.canvas.parentElement ?? this.canvas;
     const w = Math.max(1, parent.clientWidth);
     const h = Math.max(1, parent.clientHeight);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
-    // On wide screens the side panel covers the left edge, so the view is
-    // shifted right to keep the Kaabah in the visible part of the canvas.
-    if (w >= 900) this.camera.setViewOffset(w, h, -222, 0, w, h);
-    else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
-    if (first) {
-      // Narrow (portrait) views sit further back so the whole Haram fits.
-      const dist = this.camera.aspect < 1 ? 1500 : 1250;
-      const dir = new THREE.Vector3(0.5, 0.58, 0.7).normalize();
-      this.camera.position.copy(dir.multiplyScalar(dist));
-      this.controls.update();
-    }
     this.needsRender = true;
+  }
+
+  private updatePins() {
+    const w = this.canvas.clientWidth;
+    const h = this.canvas.clientHeight;
+    for (const pin of this.pins) {
+      this.tmp.set(pin.pos[0], 26, pin.pos[1]).project(this.camera);
+      const visible = this.tmp.z < 1 && Math.abs(this.tmp.x) < 1.2 && Math.abs(this.tmp.y) < 1.2;
+      pin.el.style.visibility = visible ? 'visible' : 'hidden';
+      if (!visible) continue;
+      const x = (this.tmp.x * 0.5 + 0.5) * w;
+      const y = (-this.tmp.y * 0.5 + 0.5) * h;
+      pin.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+    }
   }
 
   private tick = (time: number) => {
@@ -247,9 +371,19 @@ export class CityScene {
       this.placeNodes();
       this.needsRender = true;
     }
+    if (this.flight) {
+      const f = this.flight;
+      f.t = Math.min(1, f.t + dt / 0.6);
+      const e = 1 - Math.pow(1 - f.t, 3);
+      this.camera.position.lerpVectors(f.fromPos, f.toPos, e);
+      this.controls.target.lerpVectors(f.fromTarget, f.toTarget, e);
+      if (f.t >= 1) this.flight = null;
+      this.needsRender = true;
+    }
     this.controls.update();
     if (this.needsRender) {
       this.renderer.render(this.scene, this.camera);
+      this.updatePins();
       this.needsRender = false;
     }
   };

@@ -1,39 +1,35 @@
 import { useEffect, useRef, useState } from 'react';
-import { CityScene } from './scene/CityScene';
-import { THEMES, THEME_ORDER, type ThemeId } from './themes';
+import { CityScene, type Pin } from './scene/CityScene';
+import { CLAY } from './themes';
+import { MARWA, SAFA, STEPS } from './data/steps';
 
-// Stage 1: a single preview screen for comparing the three visual styles.
+// The overview screen: an aerial map of the Haram with a numbered pin for
+// each Umrah step, and a sheet that names the selected step.
 
-const STEPS = ['Ihram and miqat', 'Niyyah and talbiyah', 'Entering Masjid al-Haram', 'Tawaf', 'Maqam Ibrahim and Zamzam', "Sa'i", 'Halq or taqsir'];
-const CURRENT = 3;
-const CIRCUIT = 3;
-
-// Sample text for the style review only. Fetched from quran.ai, not typed from memory.
-const SAMPLE_VERSE = {
-  arabic:
-    '۞ إِنَّ ٱلصَّفَا وَٱلْمَرْوَةَ مِن شَعَآئِرِ ٱللَّهِ ۖ فَمَنْ حَجَّ ٱلْبَيْتَ أَوِ ٱعْتَمَرَ فَلَا جُنَاحَ عَلَيْهِ أَن يَطَّوَّفَ بِهِمَا ۚ وَمَن تَطَوَّعَ خَيْرًا فَإِنَّ ٱللَّهَ شَاكِرٌ عَلِيمٌ',
-  meaning:
-    'Safa and Marwa are among the rites of God, so for those who make major or minor pilgrimage to the House it is no offence to circulate between the two. Anyone who does good of his own accord will be rewarded, for God rewards good deeds, and knows everything.',
-  reference: 'Quran 2:158',
-  translator: 'M.A.S. Abdel Haleem',
-  url: 'https://quran.com/2:158?translations=85',
-};
-
-function initialTheme(): ThemeId {
-  const q = new URLSearchParams(window.location.search).get('style');
-  return q && q in THEMES ? (q as ThemeId) : 'clay';
-}
+const MAP_STEPS = STEPS.filter((s) => s.pos !== null);
+const MIQAT_STEPS = STEPS.filter((s) => s.pos === null);
+const PLACES: { name: string; pos: [number, number] }[] = [
+  { name: 'Safa', pos: SAFA },
+  { name: 'Marwa', pos: MARWA },
+];
 
 export function App() {
-  const [themeId, setThemeId] = useState<ThemeId>(initialTheme);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [tilted, setTilted] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<CityScene | null>(null);
+  const pinEls = useRef(new Map<string, HTMLElement>());
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const scene = new CityScene(canvas, THEMES[initialTheme()].scene, mq.matches);
+    const points = [...MAP_STEPS.map((s) => s.pos!), ...PLACES.map((p) => p.pos)];
+    const scene = new CityScene(canvas, CLAY, mq.matches, points);
+    const pins: Pin[] = [];
+    MAP_STEPS.forEach((s) => pins.push({ el: pinEls.current.get(`step-${s.n}`)!, pos: s.pos! }));
+    PLACES.forEach((p) => pins.push({ el: pinEls.current.get(`place-${p.name}`)!, pos: p.pos }));
+    scene.setPins(pins);
     sceneRef.current = scene;
     const onChange = () => scene.setReducedMotion(mq.matches);
     mq.addEventListener('change', onChange);
@@ -44,76 +40,114 @@ export function App() {
     };
   }, []);
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = themeId;
-    sceneRef.current?.setTheme(THEMES[themeId].scene);
-  }, [themeId]);
+  const choose = (n: number | null) => {
+    setSelected(n);
+    const step = STEPS.find((s) => s.n === n);
+    if (step?.pos) sceneRef.current?.focus(step.pos);
+    else sceneRef.current?.showAll();
+    setTilted(Boolean(step?.pos));
+  };
+
+  const setPinEl = (key: string) => (el: HTMLElement | null) => {
+    if (el) pinEls.current.set(key, el);
+  };
+
+  const step = STEPS.find((s) => s.n === selected) ?? null;
 
   return (
     <div className="app">
       <div className="stage">
-        <canvas
-          ref={canvasRef}
-          role="img"
-          aria-label="3D model of the Haram area with dots circling the Kaabah anticlockwise"
-        />
-        <fieldset className="styles">
-          <legend className="sr-only">Visual style</legend>
-          {THEME_ORDER.map((id) => (
-            <label key={id} className={id === themeId ? 'is-on' : ''}>
-              <input type="radio" name="style" value={id} checked={id === themeId} onChange={() => setThemeId(id)} />
-              {THEMES[id].name}
-            </label>
+        <canvas ref={canvasRef} aria-hidden="true" />
+
+        <div className="pins">
+          {PLACES.map((p) => (
+            <span key={p.name} ref={setPinEl(`place-${p.name}`)} className="place">
+              <span>{p.name}</span>
+            </span>
           ))}
-        </fieldset>
-        <p className="notice">Placeholder city blocks. Real map data comes next.</p>
+          {MAP_STEPS.map((s) => (
+            <button
+              key={s.n}
+              ref={setPinEl(`step-${s.n}`)}
+              type="button"
+              className={`pin${selected === s.n ? ' is-on' : ''}`}
+              aria-label={`Step ${s.n}: ${s.title}`}
+              aria-pressed={selected === s.n}
+              onClick={() => choose(s.n)}
+            >
+              <span className="pin-badge">{s.n}</span>
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className={`miqat${MIQAT_STEPS.some((s) => s.n === selected) ? ' is-on' : ''}`}
+          onClick={() => choose(MIQAT_STEPS[0].n)}
+        >
+          <span className="miqat-nums" aria-hidden="true">
+            {MIQAT_STEPS.map((s) => (
+              <i key={s.n}>{s.n}</i>
+            ))}
+          </span>
+          <span>
+            <span className="sr-only">Steps 1 and 2: </span>At the miqat, before Makkah
+          </span>
+        </button>
+
+        <div className="map-controls" role="group" aria-label="Map controls">
+          <button type="button" aria-label="Zoom in" onClick={() => sceneRef.current?.zoomBy(0.7)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
+          <button type="button" aria-label="Zoom out" onClick={() => sceneRef.current?.zoomBy(1 / 0.7)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /></svg>
+          </button>
+          <button type="button" aria-label="Rotate the map" onClick={() => sceneRef.current?.rotateBy(Math.PI / 4)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.3-5.2M19 4v4h-4" /></svg>
+          </button>
+          <button
+            type="button"
+            aria-label={tilted ? 'Look straight down' : 'Tilt the map'}
+            onClick={() => setTilted(sceneRef.current?.toggleTilt() ?? false)}
+          >
+            <span className="tilt-label">{tilted ? '2D' : '3D'}</span>
+          </button>
+        </div>
+
+        <p className="notice">Placeholder city. Pin positions are approximate.</p>
       </div>
 
       <main className="sheet">
         <div className="sheet-inner">
-          <ol className="progress" aria-label={`Step ${CURRENT + 1} of ${STEPS.length}: ${STEPS[CURRENT]}`}>
-            {STEPS.map((s, i) => (
-              <li key={s} className={i < CURRENT ? 'done' : i === CURRENT ? 'now' : ''} aria-hidden="true" />
+          <div className="sheet-head">
+            <div>
+              <p className="step-count">{step ? `Step ${step.n} of ${STEPS.length}` : 'Umrah in seven steps'}</p>
+              <h1>{step ? step.title : 'Where each step happens'}</h1>
+            </div>
+            {step && (
+              <button type="button" className="btn ghost" onClick={() => choose(null)}>
+                Show all
+              </button>
+            )}
+          </div>
+          <p className="lede">
+            {step ? step.summary : 'Tap a number on the map or below to see where a step takes place.'}
+          </p>
+          <ol className="stepper" aria-label="Steps">
+            {STEPS.map((s) => (
+              <li key={s.n}>
+                <button
+                  type="button"
+                  className={selected === s.n ? 'is-on' : ''}
+                  aria-label={`Step ${s.n}: ${s.title}`}
+                  aria-pressed={selected === s.n}
+                  onClick={() => choose(s.n)}
+                >
+                  {s.n}
+                </button>
+              </li>
             ))}
           </ol>
-          <p className="step-count">
-            Step {CURRENT + 1} of {STEPS.length}
-          </p>
-          <h1>{STEPS[CURRENT]}</h1>
-          <p className="lede">Seven circuits around the Kaabah, starting and ending at the Black Stone line.</p>
-
-          <div className="circuits" aria-label={`Circuit ${CIRCUIT} of 7`}>
-            <span className="circuit-dots" aria-hidden="true">
-              {Array.from({ length: 7 }, (_, i) => (
-                <i key={i} className={i < CIRCUIT ? 'on' : ''} />
-              ))}
-            </span>
-            <span className="circuit-label">
-              Circuit <b>{CIRCUIT}</b> of 7
-            </span>
-          </div>
-
-          <section className="dua" aria-label="Sample verse">
-            <p className="dua-arabic" lang="ar" dir="rtl">
-              {SAMPLE_VERSE.arabic}
-            </p>
-            <p className="dua-meaning">{SAMPLE_VERSE.meaning}</p>
-            <p className="dua-source">
-              <a href={SAMPLE_VERSE.url} target="_blank" rel="noreferrer">
-                {SAMPLE_VERSE.reference}
-              </a>
-              , translated by {SAMPLE_VERSE.translator}. Sample text for the style review, not this step's dua.
-            </p>
-          </section>
-
-          <nav className="step-nav" aria-label="Steps">
-            <button type="button" className="btn ghost">
-              Previous
-            </button>
-            <button type="button" className="btn primary">
-              Next: {STEPS[CURRENT + 1]}
-            </button>
-          </nav>
         </div>
       </main>
     </div>

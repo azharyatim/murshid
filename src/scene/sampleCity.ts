@@ -1,4 +1,4 @@
-// PLACEHOLDER city used only for the stage 1 style review.
+// PLACEHOLDER city used until real map data is available.
 // It is procedurally generated and does not match real streets. It will be
 // replaced by pre-baked OpenStreetMap buildings and roads.
 
@@ -27,7 +27,7 @@ function mulberry32(seed: number) {
   };
 }
 
-export function generateSampleCity(radius = 1050, clearRadius = 225): SampleCity {
+export function generateSampleCity(radius = 1150, clearRadius = 350): SampleCity {
   const rnd = mulberry32(7);
   const cell = 74;
   const road = 15;

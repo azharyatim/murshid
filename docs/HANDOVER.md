@@ -151,6 +151,14 @@ The owner downloaded the OpenStreetMap export by hand through Overpass Turbo; th
 
 The owner reviews on their phone through a private Claude page: https://claude.ai/artifact/TVMByBrJu5m5qKzZiPbjGL. It is built with `VITE_DEFAULT_LOOK=cyan-light npx vite build --base ./ --outDir <scratch>/preview`, and the built `index.html` is reduced to its content (title, script, stylesheet, `#root`) because the Artifact tool adds the document wrapper. It shows only cyan on beige (option A), with cast shadows at half strength (`shadowStrength: 0.5`) at the owner's request. Republish to the same URL after changes.
 
+## Scope change: Makkah and Madinah guide (owner's decisions)
+
+- The app is now **Murshid: Umrah and Madinah Guide**. It shows the usual places of interest around Makkah and Madinah as well as the Umrah steps.
+- **Navigation:** the default view shows both cities on one map; people zoom in and out to move between them. There are no tabs or home screen for now.
+- **Far places** (Arafah, Jabal al-Nur, Uhud, Quba...) appear on a flat regional map with pins. The detailed 3D city is only around the Haram and the Prophet's Mosque. 3D around each place is a possible later feature.
+- **Order:** places come next, before stage 2 (steps and duas). The owner approves the place list first: draft in `docs/places-draft.md`.
+- The Madinah 3D core needs the same two OpenStreetMap downloads as Makkah (buildings and roads, then building parts), centred on the Prophet's Mosque.
+
 ## Later feature ideas from the owner (not scheduled)
 
 - **Hotels.** Colour hotels differently, and let a pilgrim find their own hotel and see the walking route to the Haram. In the current export 158 of 413 outlines are tagged as hotels (127 named); unmarked buildings may be hotels too, so this must be labelled as incomplete.

@@ -70,6 +70,10 @@ const MIN_POLAR = 0.02; // straight down
 const MAX_POLAR = 1.3; // close to the horizon
 const AERIAL_POLAR = 0.4;
 const TILTED_POLAR = 1.0;
+// When the map first tilts from the default north-up view, look from the north
+// side (camera north of the Haram, facing south). From the south the Clock
+// Towers stand in front of the Haram and hide pins; from the north every pin is clear.
+const TILTED_AZIMUTH = Math.PI;
 
 interface TawafNode {
   radius: number;
@@ -476,9 +480,15 @@ export class CityScene {
     this.flyTo(this.overview.center.clone(), dist, AERIAL_POLAR, 0, animate);
   }
 
+  /** The compass direction for a tilted view: the user's own, unless still at the default north-up. */
+  private tiltAzimuth() {
+    const az = this.controls.getAzimuthalAngle();
+    return Math.abs(az) < 0.01 ? TILTED_AZIMUTH : az;
+  }
+
   /** Move in on one point, keeping the current compass direction. */
   focus(pos: [number, number]) {
-    this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), 720, 0.75, this.controls.getAzimuthalAngle());
+    this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), 720, 0.75, this.tiltAzimuth());
   }
 
   zoomBy(factor: number) {
@@ -492,7 +502,12 @@ export class CityScene {
   /** Switch between looking straight down and a tilted 3D view. Returns true if now tilted. */
   toggleTilt() {
     const tilted = this.controls.getPolarAngle() > 0.6;
-    this.flyTo(this.controls.target.clone(), this.distance(), tilted ? MIN_POLAR : TILTED_POLAR, this.controls.getAzimuthalAngle());
+    this.flyTo(
+      this.controls.target.clone(),
+      this.distance(),
+      tilted ? MIN_POLAR : TILTED_POLAR,
+      tilted ? this.controls.getAzimuthalAngle() : this.tiltAzimuth(),
+    );
     return !tilted;
   }
 

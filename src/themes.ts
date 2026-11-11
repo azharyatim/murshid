@@ -20,6 +20,8 @@ export interface SceneTheme {
   buildingGlow?: number;
   /** Colour buildings show regardless of light. Overrides buildingGlow when set. */
   buildingEmissive?: number;
+  /** Road colour on real map data. Defaults to the slab colour. */
+  road?: number;
 }
 
 export const CLAY: SceneTheme = {
@@ -77,6 +79,7 @@ export const CLAY_CYAN_LIGHT: SceneTheme = {
   ground: 0xefe6d3,
   slab: 0xf3ebdb,
   skyGround: 0xefe6d3,
+  road: 0xe4d8c1,
   sunIntensity: 2.1,
   skyIntensity: 2.0,
   baseShade: 0.93,

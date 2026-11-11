@@ -1,7 +1,7 @@
 // The seven Umrah steps shown on the overview map.
 //
-// Positions are metres from the Kaabah (x = east, z = south). They are
-// APPROXIMATE placeholders and must be re-derived from map data in stage 3.
+// Positions are metres from the Kaabah (x = east, z = south). Apart from
+// Safa and Marwa they are APPROXIMATE placeholders, to be re-derived in stage 3.
 // The one-line summaries only restate the project brief; explanations, duas
 // and rulings are added in stage 2 after source verification.
 
@@ -13,8 +13,10 @@ export interface Step {
   pos: [number, number] | null;
 }
 
-export const SAFA: [number, number] = [119, 93];
-export const MARWA: [number, number] = [109, -300];
+// Safa and Marwa are the south and north ends of the Mas'a walkway in
+// OpenStreetMap (see scripts/bake-osm.mjs). The other pins are still placeholders.
+export const SAFA: [number, number] = [130, 85.3];
+export const MARWA: [number, number] = [101.4, -307.5];
 
 export const STEPS: Step[] = [
   { n: 1, title: 'Ihram and miqat', summary: 'Entering ihram at the miqat, before reaching Makkah.', pos: null },

@@ -8,6 +8,7 @@ import type { SceneTheme } from '../themes';
 import { MARWA, SAFA } from '../data/steps';
 import { generateSampleCity, type Box } from './sampleCity';
 import { generateModelCity, terrainHeight } from './modelCity';
+import { buildingGeometry, kaabahGeometry, matafClearance, matafGeometry, roadGeometry, type CityData } from './realCity';
 
 /**
  * 'plain' is the flat placeholder grid with simple lighting.
@@ -35,7 +36,8 @@ function addWindows(material: THREE.MeshStandardMaterial) {
           // x: metres along the wall from its centre, y: metres up, z: wall width (0 on roofs)
           vWin = vec3(alongWall, position.y * winScale.y, abs(normal.y) > 0.5 ? 0.0 : wallWidth);
         #else
-          vWin = vec3(0.0);
+          // Merged real buildings: measure along the wall in world space. No corner bands.
+          vWin = vec3(dot(position.xz, vec2(-normal.z, normal.x)), position.y, abs(normal.y) > 0.5 ? 0.0 : 1000.0);
         #endif`,
       );
     shader.fragmentShader = shader.fragmentShader
@@ -109,6 +111,7 @@ export class CityScene {
     haram: new THREE.MeshStandardMaterial({ roughness: 0.9 }),
     kaabah: new THREE.MeshStandardMaterial({ roughness: 0.85 }),
     node: new THREE.MeshBasicMaterial(),
+    road: new THREE.MeshStandardMaterial({ roughness: 1, side: THREE.DoubleSide }),
   };
   private nodes: TawafNode[] = [];
   private nodeMesh: THREE.InstancedMesh;
@@ -130,6 +133,8 @@ export class CityScene {
     /** Points that the default aerial view must keep in frame. */
     overviewPoints: [number, number][],
     private look: Look = 'plain',
+    /** Real OpenStreetMap city. When given, it replaces the illustrative city and Haram. */
+    city: CityData | null = null,
   ) {
     this.reducedMotion = reducedMotion;
     const model = look !== 'plain';
@@ -170,7 +175,28 @@ export class CityScene {
     this.scene.add(this.sun, this.sky);
 
     // Ground (roads and open space).
-    if (model) {
+    if (city) {
+      // Real map data sits on flat ground: there is no real terrain yet.
+      const ground = new THREE.Mesh(new THREE.CircleGeometry(4000, 64), this.mats.ground);
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      this.scene.add(ground);
+      const roads = new THREE.Mesh(roadGeometry(city), this.mats.road);
+      roads.receiveShadow = true;
+      this.scene.add(roads);
+      this.mats.building.vertexColors = true;
+      if (look === 'cyan') addWindows(this.mats.building);
+      const addMerged = (geo: THREE.BufferGeometry | null, mat: THREE.Material) => {
+        if (!geo) return;
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        this.scene.add(mesh);
+      };
+      addMerged(buildingGeometry(city, ['building'], theme.baseShade ?? 0.8), this.mats.building);
+      addMerged(buildingGeometry(city, ['haram', 'roof']), this.mats.haram);
+      addMerged(matafGeometry(city), this.mats.haram);
+    } else if (model) {
       this.scene.add(this.buildTerrain());
       this.mats.building.vertexColors = true;
       if (look === 'cyan') addWindows(this.mats.building);
@@ -184,12 +210,17 @@ export class CityScene {
       this.scene.add(this.boxes(city.slabs, this.mats.slab, false));
       this.scene.add(this.boxes(city.buildings, this.mats.building, true));
     }
-    this.buildHaram();
+    if (!city) this.buildHaram();
 
-    // The Kaabah: a simple cube, the only dark object in the scene.
-    const kaabah = new THREE.Mesh(new THREE.BoxGeometry(11, 13, 12.5), this.mats.kaabah);
-    kaabah.position.y = 6.5;
-    kaabah.rotation.y = 0.5;
+    // The Kaabah: simple massing, the only dark object in the scene. With real
+    // data it is the OpenStreetMap footprint; otherwise a placeholder cube.
+    const kaabah = city
+      ? new THREE.Mesh(kaabahGeometry(city), this.mats.kaabah)
+      : new THREE.Mesh(new THREE.BoxGeometry(11, 13, 12.5), this.mats.kaabah);
+    if (!city) {
+      kaabah.position.y = 6.5;
+      kaabah.rotation.y = 0.5;
+    }
     kaabah.castShadow = true;
     this.scene.add(kaabah);
 
@@ -200,8 +231,11 @@ export class CityScene {
       seed = (seed * 16807) % 2147483647;
       return seed / 2147483647;
     };
+    // Keep the circling nodes inside the open courtyard.
+    const clearance = city ? matafClearance(city) : null;
+    const maxRadius = clearance ? Math.min(61, clearance - 4) : 61;
     for (let i = 0; i < NODE_COUNT; i++) {
-      const radius = 13 + Math.pow(rnd(), 1.4) * 48;
+      const radius = 13 + Math.pow(rnd(), 1.4) * (maxRadius - 13);
       this.nodes.push({ radius, angle: rnd() * Math.PI * 2, speed: (5.5 + rnd() * 2) / radius });
     }
     this.placeNodes();
@@ -356,6 +390,7 @@ export class CityScene {
     this.scene.background = new THREE.Color(t.background);
     this.scene.fog = new THREE.Fog(t.background, 1900, 4200);
     this.mats.ground.color.set(t.ground);
+    this.mats.road.color.set(t.road ?? t.slab);
     this.mats.slab.color.set(t.slab);
     this.mats.building.color.set(t.building);
     if (t.buildingEmissive !== undefined) this.mats.building.emissive.set(t.buildingEmissive);

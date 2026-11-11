@@ -131,7 +131,17 @@ Ask these first. They were the last things put to the owner and none has been an
 2. **How to get real map data** (see the blocker).
 3. **Whether to start stage 2 now**, since it does not need the map.
 
-## Blocker: real map data
+## Real map data: update
+
+The owner downloaded the OpenStreetMap export by hand through Overpass Turbo; the direct Overpass link returned 406 in their browser, and the servers are still unreachable from the sessions. The raw file is `data/raw/makkah-haram.json` (gitignored; ask the owner to attach it again if it is missing). `node scripts/bake-osm.mjs makkah-haram` turns it into `public/data/makkah-haram.json`, which the app loads.
+
+- Only `?look=cyan-light` (the owner's chosen Option A, with their beige ground #efe6d3) draws the real city. The other looks still show the illustrative city for comparison.
+- The ground is flat: no terrain source yet. Most heights (337 of 428 footprints) are estimates.
+- The Clock Towers relation is tagged 601 m for the whole complex, so it gets an estimated podium height until `building:part` data is downloaded.
+- Safa and Marwa pins now come from the ends of the Mas'a walkway in OSM. The other pins are still placeholders.
+- The accent colour to replace the green is still the owner's decision.
+
+## Blocker: real map data (history)
 
 The owner chose real OpenStreetMap data, but the previous session could not download it.
 

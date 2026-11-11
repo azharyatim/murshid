@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CityScene, type Look, type Pin } from './scene/CityScene';
 import { CLAY, CLAY_CYAN, CLAY_CYAN_FLAT, CLAY_CYAN_LIGHT, CLAY_MODEL } from './themes';
 import { MARWA, SAFA, STEPS } from './data/steps';
+import { loadCity, type CityData } from './scene/realCity';
 
 // The overview screen: an aerial map of the Haram with a numbered pin for
 // each Umrah step, and a sheet that names the selected step.
@@ -27,6 +28,9 @@ const THEMES = {
 const LOOK_KEY = (LOOK_PARAM in THEMES ? LOOK_PARAM : 'plain') as keyof typeof THEMES;
 const LOOK: Look = LOOK_KEY.startsWith('cyan') ? 'cyan' : (LOOK_KEY as Look);
 const SCENE_THEME = THEMES[LOOK_KEY];
+// Option A (cyan-light) is drawn on real OpenStreetMap data; the other looks
+// keep the illustrative city so they can still be compared.
+const REAL_CITY = LOOK_KEY === 'cyan-light';
 
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);
@@ -35,12 +39,20 @@ export function App() {
   const sceneRef = useRef<CityScene | null>(null);
   const pinEls = useRef(new Map<string, HTMLElement>());
 
+  const [city, setCity] = useState<CityData | null>(null);
+  const [cityError, setCityError] = useState(false);
+
+  useEffect(() => {
+    if (!REAL_CITY) return;
+    loadCity('makkah-haram').then(setCity, () => setCityError(true));
+  }, []);
+
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || (REAL_CITY && !city && !cityError)) return;
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     const points = [...MAP_STEPS.map((s) => s.pos!), ...PLACES.map((p) => p.pos)];
-    const scene = new CityScene(canvas, SCENE_THEME, mq.matches, points, LOOK);
+    const scene = new CityScene(canvas, SCENE_THEME, mq.matches, points, LOOK, city);
     const pins: Pin[] = [];
     MAP_STEPS.forEach((s) => pins.push({ el: pinEls.current.get(`step-${s.n}`)!, pos: s.pos! }));
     PLACES.forEach((p) => pins.push({ el: pinEls.current.get(`place-${p.name}`)!, pos: p.pos }));
@@ -53,7 +65,7 @@ export function App() {
       scene.dispose();
       sceneRef.current = null;
     };
-  }, []);
+  }, [city, cityError]);
 
   const choose = (n: number | null) => {
     setSelected(n);
@@ -130,9 +142,11 @@ export function App() {
         </div>
 
         <p className="notice">
-          {LOOK !== 'plain'
-            ? 'Illustrative hills and buildings, not real map data.'
-            : 'Placeholder city. Pin positions are approximate.'}
+          {city
+            ? 'Map © OpenStreetMap. Most heights estimated.'
+            : LOOK !== 'plain'
+              ? 'Illustrative hills and buildings, not real map data.'
+              : 'Placeholder city. Pin positions are approximate.'}
         </p>
       </div>
 

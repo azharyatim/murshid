@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { CityScene, type Look, type Pin } from './scene/CityScene';
-import { CLAY, CLAY_CYAN, CLAY_CYAN_FLAT, CLAY_CYAN_LIGHT, CLAY_GREEN, CLAY_MODEL } from './themes';
+import {
+  CLAY,
+  CLAY_CYAN,
+  CLAY_CYAN_FLAT,
+  CLAY_CYAN_GREY,
+  CLAY_CYAN_LIGHT,
+  CLAY_GREEN,
+  CLAY_MODEL,
+  CLAY_PLAIN_GREY,
+} from './themes';
 import { MARWA, SAFA, STEPS } from './data/steps';
 import { loadCity, type CityData } from './scene/realCity';
 
@@ -25,14 +34,17 @@ const THEMES = {
   'cyan-light': CLAY_CYAN_LIGHT,
   'cyan-flat': CLAY_CYAN_FLAT,
   green: CLAY_GREEN,
+  'cyan-grey': CLAY_CYAN_GREY,
+  'clay-grey': CLAY_PLAIN_GREY,
 } as const;
 const LOOK_KEY = (LOOK_PARAM in THEMES ? LOOK_PARAM : 'plain') as keyof typeof THEMES;
 // Every cyan option and the green look use the 'cyan' scene setup (lighting, drawn windows).
-const LOOK: Look = LOOK_KEY.startsWith('cyan') || LOOK_KEY === 'green' ? 'cyan' : (LOOK_KEY as Look);
+const LOOK: Look =
+  LOOK_KEY.startsWith('cyan') || LOOK_KEY === 'green' ? 'cyan' : LOOK_KEY === 'clay-grey' ? 'plain' : (LOOK_KEY as Look);
 const SCENE_THEME = THEMES[LOOK_KEY];
-// Option A (cyan-light) and the green look are drawn on real OpenStreetMap data; the other looks
+// Option A (cyan-light), green, cyan-grey and clay-grey are drawn on real OpenStreetMap data; the other looks
 // keep the illustrative city so they can still be compared.
-const REAL_CITY = LOOK_KEY === 'cyan-light' || LOOK_KEY === 'green';
+const REAL_CITY = ['cyan-light', 'green', 'cyan-grey', 'clay-grey'].includes(LOOK_KEY);
 
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);

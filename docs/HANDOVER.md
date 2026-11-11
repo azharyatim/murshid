@@ -142,6 +142,11 @@ The owner downloaded the OpenStreetMap export by hand through Overpass Turbo; th
 - Safa and Marwa pins now come from the ends of the Mas'a walkway in OSM. The other pins are still placeholders.
 - The accent colour to replace the green is still the owner's decision.
 
+## Accent and grey-ground looks
+
+- The interface accent is now orange `#b8520b` (owner's choice). It is deeper than the map's `#e8771a` nodes so white text on it reaches 4.9:1; the node orange would give only 3:1.
+- `?look=cyan-grey` (option A cyan on light grey ground) and `?look=clay-grey` (the first plain Clay look on light grey ground, with orange nodes) were added for comparison. Both use the real city. Comparison images are in `docs/grey-ground/`.
+
 ## Later feature ideas from the owner (not scheduled)
 
 - **Hotels.** Colour hotels differently, and let a pilgrim find their own hotel and see the walking route to the Haram. In the current export 158 of 413 outlines are tagged as hotels (127 named); unmarked buildings may be hotels too, so this must be labelled as incomplete.

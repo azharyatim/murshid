@@ -112,3 +112,18 @@ export const CLAY_GREEN: SceneTheme = {
   skyGround: 0xebedee,
   road: 0xdfe3e4,
 };
+
+/** Very light grey ground shared by the grey-ground looks (owner's sample about #e7e9ea). */
+const LIGHT_GREY_GROUND = {
+  background: 0xebedee,
+  ground: 0xebedee,
+  slab: 0xf0f2f2,
+  skyGround: 0xebedee,
+  road: 0xdfe3e4,
+};
+
+/** Option A's cyan on the light grey ground. */
+export const CLAY_CYAN_GREY: SceneTheme = { ...CLAY_CYAN_LIGHT, ...LIGHT_GREY_GROUND };
+
+/** The first plain Clay look (white buildings, simple lighting) on the light grey ground. */
+export const CLAY_PLAIN_GREY: SceneTheme = { ...CLAY, ...LIGHT_GREY_GROUND, node: 0xe8771a }; // orange nodes to match the orange accent

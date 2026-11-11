@@ -22,6 +22,8 @@ export interface SceneTheme {
   buildingEmissive?: number;
   /** Road colour on real map data. Defaults to the slab colour. */
   road?: number;
+  /** How dark cast shadows are, 0 (none) to 1 (full). Default 1. */
+  shadowStrength?: number;
 }
 
 export const CLAY: SceneTheme = {
@@ -81,6 +83,8 @@ export const CLAY_CYAN_LIGHT: SceneTheme = {
   slab: 0xf9f5ed,
   skyGround: 0xf7f3e9,
   road: 0xf2ece0,
+  // Cast shadows at half strength, at the owner's request.
+  shadowStrength: 0.5,
   sunIntensity: 2.1,
   skyIntensity: 2.0,
   baseShade: 0.93,
@@ -105,6 +109,7 @@ export const CLAY_CYAN_FLAT: SceneTheme = {
  */
 export const CLAY_GREEN: SceneTheme = {
   ...CLAY_CYAN_LIGHT,
+  shadowStrength: 1,
   building: 0x5ccf9c,
   background: 0xebedee,
   ground: 0xebedee,
@@ -123,7 +128,7 @@ const LIGHT_GREY_GROUND = {
 };
 
 /** Option A's cyan on the light grey ground. */
-export const CLAY_CYAN_GREY: SceneTheme = { ...CLAY_CYAN_LIGHT, ...LIGHT_GREY_GROUND };
+export const CLAY_CYAN_GREY: SceneTheme = { ...CLAY_CYAN_LIGHT, ...LIGHT_GREY_GROUND, shadowStrength: 1 };
 
 /** The first plain Clay look (white buildings, simple lighting) on the light grey ground. */
 export const CLAY_PLAIN_GREY: SceneTheme = { ...CLAY, ...LIGHT_GREY_GROUND, node: 0xe8771a }; // orange nodes to match the orange accent

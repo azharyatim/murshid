@@ -26,7 +26,8 @@ const PLACES: { name: string; pos: [number, number] }[] = [
 // The plain look stays the default until the model look is approved.
 // Add ?look=model or ?look=cyan to the address to see the mockups.
 // ?look=cyan-light and ?look=cyan-flat are two ways of keeping the cyan from turning teal.
-const LOOK_PARAM = new URLSearchParams(window.location.search).get('look') ?? '';
+// A build can choose the look that opens by default with VITE_DEFAULT_LOOK (used for preview pages).
+const LOOK_PARAM = new URLSearchParams(window.location.search).get('look') ?? import.meta.env.VITE_DEFAULT_LOOK ?? '';
 const THEMES = {
   plain: CLAY,
   model: CLAY_MODEL,

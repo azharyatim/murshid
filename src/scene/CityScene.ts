@@ -416,6 +416,7 @@ export class CityScene {
     this.mats.node.color.set(t.node);
     this.sun.color.set(t.sun);
     this.sun.intensity = t.sunIntensity;
+    this.sun.shadow.intensity = t.shadowStrength ?? 1;
     this.sky.color.set(t.sky);
     this.sky.groundColor.set(t.skyGround);
     this.sky.intensity = t.skyIntensity;

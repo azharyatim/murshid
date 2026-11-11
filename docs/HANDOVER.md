@@ -147,6 +147,10 @@ The owner downloaded the OpenStreetMap export by hand through Overpass Turbo; th
 - The interface accent is now orange `#b8520b` (owner's choice). It is deeper than the map's `#e8771a` nodes so white text on it reaches 4.9:1; the node orange would give only 3:1.
 - `?look=cyan-grey` (option A cyan on light grey ground) and `?look=clay-grey` (the first plain Clay look on light grey ground, with orange nodes) were added for comparison. Both use the real city. Comparison images are in `docs/grey-ground/`.
 
+## Private preview page
+
+The owner reviews on their phone through a private Claude page: https://claude.ai/artifact/TVMByBrJu5m5qKzZiPbjGL. It is built with `VITE_DEFAULT_LOOK=cyan-light npx vite build --base ./ --outDir <scratch>/preview`, and the built `index.html` is reduced to its content (title, script, stylesheet, `#root`) because the Artifact tool adds the document wrapper. It shows only cyan on beige (option A), with cast shadows at half strength (`shadowStrength: 0.5`) at the owner's request. Republish to the same URL after changes.
+
 ## Later feature ideas from the owner (not scheduled)
 
 - **Hotels.** Colour hotels differently, and let a pilgrim find their own hotel and see the walking route to the Haram. In the current export 158 of 413 outlines are tagged as hotels (127 named); unmarked buildings may be hotels too, so this must be labelled as incomplete.

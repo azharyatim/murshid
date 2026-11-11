@@ -118,7 +118,6 @@ export function App() {
           </button>
         </div>
 
-        {LOOK === 'model' && <div className="tilt-shift" aria-hidden="true" />}
         <p className="notice">
           {LOOK === 'model'
             ? 'Illustrative hills and buildings, not real map data.'

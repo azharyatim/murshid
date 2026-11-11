@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CityScene, type Look, type Pin } from './scene/CityScene';
-import { CLAY, CLAY_CYAN, CLAY_MODEL } from './themes';
+import { CLAY, CLAY_CYAN, CLAY_CYAN_FLAT, CLAY_CYAN_LIGHT, CLAY_MODEL } from './themes';
 import { MARWA, SAFA, STEPS } from './data/steps';
 
 // The overview screen: an aerial map of the Haram with a numbered pin for
@@ -15,9 +15,18 @@ const PLACES: { name: string; pos: [number, number] }[] = [
 
 // The plain look stays the default until the model look is approved.
 // Add ?look=model or ?look=cyan to the address to see the mockups.
-const LOOK_PARAM = new URLSearchParams(window.location.search).get('look');
-const LOOK: Look = LOOK_PARAM === 'model' || LOOK_PARAM === 'cyan' ? LOOK_PARAM : 'plain';
-const SCENE_THEME = { plain: CLAY, model: CLAY_MODEL, cyan: CLAY_CYAN }[LOOK];
+// ?look=cyan-light and ?look=cyan-flat are two ways of keeping the cyan from turning teal.
+const LOOK_PARAM = new URLSearchParams(window.location.search).get('look') ?? '';
+const THEMES = {
+  plain: CLAY,
+  model: CLAY_MODEL,
+  cyan: CLAY_CYAN,
+  'cyan-light': CLAY_CYAN_LIGHT,
+  'cyan-flat': CLAY_CYAN_FLAT,
+} as const;
+const LOOK_KEY = (LOOK_PARAM in THEMES ? LOOK_PARAM : 'plain') as keyof typeof THEMES;
+const LOOK: Look = LOOK_KEY.startsWith('cyan') ? 'cyan' : (LOOK_KEY as Look);
+const SCENE_THEME = THEMES[LOOK_KEY];
 
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);

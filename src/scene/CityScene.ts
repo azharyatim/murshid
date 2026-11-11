@@ -43,6 +43,7 @@ function addWindows(material: THREE.MeshStandardMaterial) {
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
+        float winShade = 1.0;
         if (vWin.z > 0.0) {
           const vec2 cell = vec2(4.2, 3.6); // window spacing and floor height in metres
           vec2 g = vec2(vWin.x + vWin.z * 0.5, vWin.y - 4.5) / cell;
@@ -51,9 +52,11 @@ function addWindows(material: THREE.MeshStandardMaterial) {
           // Keep a plain band at the base, the top and the corners.
           win *= step(0.0, g.y) * step(abs(vWin.x), vWin.z * 0.5 - 1.2);
           float detail = 1.0 - clamp(max(fwidth(g.x), fwidth(g.y)) * 1.6, 0.0, 1.0);
-          diffuseColor.rgb *= 1.0 - 0.24 * win * detail;
+          winShade = 1.0 - 0.24 * win * detail;
+          diffuseColor.rgb *= winShade;
         }`,
-      );
+      )
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= winShade;');
   };
 }
 
@@ -171,7 +174,7 @@ export class CityScene {
       this.scene.add(this.buildTerrain());
       this.mats.building.vertexColors = true;
       if (look === 'cyan') addWindows(this.mats.building);
-      this.scene.add(this.boxes(generateModelCity(), this.mats.building, true, true));
+      this.scene.add(this.boxes(generateModelCity(), this.mats.building, true, theme.baseShade ?? 0.8));
     } else {
       const ground = new THREE.Mesh(new THREE.CircleGeometry(4000, 64), this.mats.ground);
       ground.rotation.x = -Math.PI / 2;
@@ -256,14 +259,14 @@ export class CityScene {
     return mesh;
   }
 
-  private boxes(list: Box[], material: THREE.Material, castShadow: boolean, shaded = false) {
+  private boxes(list: Box[], material: THREE.Material, castShadow: boolean, baseShade?: number) {
     const geo = new THREE.BoxGeometry(1, 1, 1);
     geo.translate(0, 0.5, 0);
-    if (shaded) {
+    if (baseShade !== undefined) {
       // Slightly darker towards the base, a cheap stand-in for bounced light.
       const p = geo.attributes.position;
       const colors = new Float32Array(p.count * 3);
-      for (let i = 0; i < p.count; i++) colors.fill(p.getY(i) > 0.5 ? 1 : 0.8, i * 3, i * 3 + 3);
+      for (let i = 0; i < p.count; i++) colors.fill(p.getY(i) > 0.5 ? 1 : baseShade, i * 3, i * 3 + 3);
       geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     }
     const mesh = new THREE.InstancedMesh(geo, material, list.length);
@@ -355,6 +358,8 @@ export class CityScene {
     this.mats.ground.color.set(t.ground);
     this.mats.slab.color.set(t.slab);
     this.mats.building.color.set(t.building);
+    if (t.buildingEmissive !== undefined) this.mats.building.emissive.set(t.buildingEmissive);
+    else this.mats.building.emissive.set(t.building).multiplyScalar(t.buildingGlow ?? 0);
     this.mats.haram.color.set(t.haram);
     this.mats.kaabah.color.set(t.kaabah);
     this.mats.node.color.set(t.node);

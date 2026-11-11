@@ -14,6 +14,12 @@ export interface SceneTheme {
   sky: number;
   skyGround: number;
   skyIntensity: number;
+  /** Brightness at the foot of each building, 0 to 1 (model looks only). Default 0.8. */
+  baseShade?: number;
+  /** How much of the building colour shows regardless of light, 0 to 1. Flattens shading. Default 0. */
+  buildingGlow?: number;
+  /** Colour buildings show regardless of light. Overrides buildingGlow when set. */
+  buildingEmissive?: number;
 }
 
 export const CLAY: SceneTheme = {
@@ -61,4 +67,23 @@ export const CLAY_CYAN: SceneTheme = {
   sky: 0xe4ecff,
   skyGround: 0xeeeeee,
   skyIntensity: 1.3,
+};
+
+/** Cyan option A: shaded sides lifted so they stay cyan instead of turning teal. */
+export const CLAY_CYAN_LIGHT: SceneTheme = {
+  ...CLAY_CYAN,
+  sunIntensity: 2.1,
+  skyIntensity: 2.0,
+  baseShade: 0.93,
+  buildingGlow: 0.18,
+};
+
+/** Cyan option B: flat, illustration-style shading with only gentle light and shade. */
+export const CLAY_CYAN_FLAT: SceneTheme = {
+  ...CLAY_CYAN,
+  // Only the buildings are flattened: a dim lit colour plus a fixed glow, so
+  // sides differ from tops only gently. Ground, mosque and light are unchanged.
+  building: 0x1c6668,
+  buildingEmissive: 0x40b4b6,
+  baseShade: 1,
 };

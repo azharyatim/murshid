@@ -4,7 +4,7 @@ You are taking over an in-progress project from another session. This brief is e
 
 ## What this is
 
-**Murshid: Umrah Step by Step** is a mobile-first web app that guides a pilgrim through Umrah on a 3D city model. The owner is a UX designer, not a developer. They judge the work by screenshots and plain-language explanations, and they make the design and religious-content decisions. You make the technical ones.
+**Murshid: Umrah and Madinah Guide** is a mobile-first web app that guides a pilgrim through Umrah on a 3D city model, and shows the usual places of interest around Makkah and Madinah. (Renamed from "Umrah Step by Step" by the owner, who widened the scope to a Makkah and Madinah guide.) The owner is a UX designer, not a developer. They judge the work by screenshots and plain-language explanations, and they make the design and religious-content decisions. You make the technical ones.
 
 The repository is `azharyatim/murshid`, branch `main`. Work has been committed straight to `main` and pushed after every change; keep doing that unless the owner says otherwise.
 
@@ -85,7 +85,7 @@ From the owner's original brief.
 
 One screen: an overview map of the Haram area with a bottom sheet.
 
-- **Map behaviour.** The default is a north-up aerial view framed so that every step pin is visible. One finger rotates and tilts, two fingers pinch to zoom and drag to move. Four on-map buttons (zoom in, zoom out, rotate, 2D/3D tilt) make it keyboard-accessible.
+- **Map behaviour.** The default is a north-up aerial view framed so that every step pin is visible. Map-style gestures (owner's request, after nuzul-atlas.app, which the session could not reach): one finger drags the map; two fingers pinch to zoom, drag sideways to rotate, drag up or down to tilt. Four on-map buttons (zoom in, zoom out, rotate, 2D/3D tilt) make it keyboard-accessible.
 - **Pins.** Steps 3 to 7 are numbered pins on the map. Steps 1 and 2 happen at the miqat, tens to hundreds of kilometres away, so they are a "1 2 At the miqat, before Makkah" chip at the top. The plan is for that chip to open a regional miqat view in stage 3. The owner has not confirmed this approach.
 - **Sheet.** Names the selected step, shows a one-line summary, and has a row of seven number buttons. "Show all" returns to the aerial view.
 - **Nodes.** 150 dots circle the Kaabah anticlockwise. They stop when the device asks for reduced motion.

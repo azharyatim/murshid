@@ -1,4 +1,4 @@
-# Murshid: Umrah Step by Step
+# Murshid: Umrah and Madinah Guide
 
 Read `docs/HANDOVER.md` before doing anything. It holds the project brief, the decisions already made, what is placeholder, and the open questions for the owner.
 

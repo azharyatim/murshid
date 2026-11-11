@@ -263,14 +263,19 @@ export class CityScene {
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     this.overview = { center: sphere.center, radius: sphere.radius };
 
-    // Touch: one finger rotates and tilts, two fingers pinch to zoom and drag to move.
+    // Map-style gestures, at the owner's request: one finger drags the map; two
+    // fingers pinch to zoom, drag sideways to rotate and drag up or down to tilt.
+    // A mouse drags with the left button and rotates and tilts with the right.
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.minDistance = MIN_DISTANCE;
     this.controls.maxDistance = MAX_DISTANCE;
     this.controls.minPolarAngle = MIN_POLAR;
     this.controls.maxPolarAngle = MAX_POLAR;
-    this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+    this.controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
+    this.controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+    // Drag across the ground, not across the screen, so tilted views slide like a map.
+    this.controls.screenSpacePanning = false;
     this.controls.addEventListener('change', () => {
       // Keep the view from being dragged away from the Haram area.
       const t = this.controls.target;

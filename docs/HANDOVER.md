@@ -142,6 +142,14 @@ The owner downloaded the OpenStreetMap export by hand through Overpass Turbo; th
 - Safa and Marwa pins now come from the ends of the Mas'a walkway in OSM. The other pins are still placeholders.
 - The accent colour to replace the green is still the owner's decision.
 
+## Later feature ideas from the owner (not scheduled)
+
+- **Hotels.** Colour hotels differently, and let a pilgrim find their own hotel and see the walking route to the Haram. In the current export 158 of 413 outlines are tagged as hotels (127 named); unmarked buildings may be hotels too, so this must be labelled as incomplete.
+
+## Look comparison: green
+
+`?look=green` is option A's lighting with mint green buildings (#5ccf9c base, renders near the owner's sample #6edbad) on very light grey ground (#ebedee), from a second watermarked reference image the owner sent (not committed). Also drawn on the real city.
+
 ## Blocker: real map data (history)
 
 The owner chose real OpenStreetMap data, but the previous session could not download it.

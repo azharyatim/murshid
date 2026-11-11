@@ -96,3 +96,19 @@ export const CLAY_CYAN_FLAT: SceneTheme = {
   buildingEmissive: 0x40b4b6,
   baseShade: 1,
 };
+
+/**
+ * Mint green buildings on very light grey ground, from a second reference image
+ * the owner sent (sampled: lit walls about #6edbad, ground about #e7e9ea).
+ * Same lighting as option A; base colours are set a touch off the samples so the
+ * rendered colours land near them.
+ */
+export const CLAY_GREEN: SceneTheme = {
+  ...CLAY_CYAN_LIGHT,
+  building: 0x5ccf9c,
+  background: 0xebedee,
+  ground: 0xebedee,
+  slab: 0xf0f2f2,
+  skyGround: 0xebedee,
+  road: 0xdfe3e4,
+};

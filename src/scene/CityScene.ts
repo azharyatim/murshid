@@ -1,8 +1,20 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { SceneTheme } from '../themes';
 import { MARWA, SAFA } from '../data/steps';
 import { generateSampleCity, type Box } from './sampleCity';
+import { generateModelCity, terrainHeight } from './modelCity';
+
+/**
+ * 'plain' is the flat placeholder grid with simple lighting.
+ * 'model' adds hills, an irregular city, warm light with cool shadows and
+ * ambient occlusion, to read like a physical clay site model.
+ */
+export type Look = 'plain' | 'model';
 
 const NODE_COUNT = 150;
 const MATAF_RADIUS = 68;
@@ -40,6 +52,7 @@ interface Flight {
  */
 export class CityScene {
   private renderer: THREE.WebGLRenderer;
+  private composer: EffectComposer | null = null;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(32, 1, 10, 6000);
   private controls: OrbitControls;
@@ -72,40 +85,60 @@ export class CityScene {
     reducedMotion: boolean,
     /** Points that the default aerial view must keep in frame. */
     overviewPoints: [number, number][],
+    private look: Look = 'plain',
   ) {
     this.reducedMotion = reducedMotion;
+    const model = look === 'model';
     const small = Math.min(window.innerWidth, window.innerHeight) < 700;
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    if (model) {
+      // Ambient occlusion darkens corners and the foot of each building.
+      const target = new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType });
+      this.composer = new EffectComposer(this.renderer, target);
+      this.composer.addPass(new RenderPass(this.scene, this.camera));
+      const ao = new GTAOPass(this.scene, this.camera, 1, 1);
+      ao.blendIntensity = 0.8;
+      ao.updateGtaoMaterial({ radius: 14, distanceExponent: 1.6, thickness: 1.5, scale: 1, samples: small ? 8 : 16 });
+      ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: small ? 8 : 16 });
+      this.composer.addPass(ao);
+      this.composer.addPass(new OutputPass());
+    }
 
     // Lighting: one soft sun plus sky fill gives the clay-model look.
     this.sun.position.set(-520, 720, 380);
     this.sun.castShadow = true;
-    const size = small ? 1024 : 2048;
+    const size = model ? (small ? 2048 : 4096) : small ? 1024 : 2048;
     this.sun.shadow.mapSize.set(size, size);
     const sc = this.sun.shadow.camera;
-    sc.left = -1250;
-    sc.right = 1250;
-    sc.top = 1250;
-    sc.bottom = -1250;
+    const reach = model ? 1700 : 1250;
+    sc.left = -reach;
+    sc.right = reach;
+    sc.top = reach;
+    sc.bottom = -reach;
     sc.near = 100;
-    sc.far = 2400;
+    sc.far = 2800;
     this.sun.shadow.bias = -0.0006;
     this.sun.shadow.normalBias = 1.2;
     this.scene.add(this.sun, this.sky);
 
     // Ground (roads and open space).
-    const ground = new THREE.Mesh(new THREE.CircleGeometry(4000, 64), this.mats.ground);
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    this.scene.add(ground);
-
-    const city = generateSampleCity();
-    this.scene.add(this.boxes(city.slabs, this.mats.slab, false));
-    this.scene.add(this.boxes(city.buildings, this.mats.building, true));
+    if (model) {
+      this.scene.add(this.buildTerrain());
+      this.mats.building.vertexColors = true;
+      this.scene.add(this.boxes(generateModelCity(), this.mats.building, true, true));
+    } else {
+      const ground = new THREE.Mesh(new THREE.CircleGeometry(4000, 64), this.mats.ground);
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      this.scene.add(ground);
+      const city = generateSampleCity();
+      this.scene.add(this.boxes(city.slabs, this.mats.slab, false));
+      this.scene.add(this.boxes(city.buildings, this.mats.building, true));
+    }
     this.buildHaram();
 
     // The Kaabah: a simple cube, the only dark object in the scene.
@@ -164,12 +197,36 @@ export class CityScene {
     this.raf = requestAnimationFrame(this.tick);
   }
 
-  private boxes(list: Box[], material: THREE.Material, castShadow: boolean) {
+  /** Hills in stacked contour layers, like a cut-card site model. Illustrative only. */
+  private buildTerrain() {
+    const size = 5200;
+    const seg = 360;
+    const geo = new THREE.PlaneGeometry(size, size, seg, seg);
+    geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      pos.setY(i, terrainHeight(pos.getX(i), pos.getZ(i)));
+    }
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, this.mats.ground);
+    mesh.receiveShadow = true;
+    mesh.castShadow = true;
+    return mesh;
+  }
+
+  private boxes(list: Box[], material: THREE.Material, castShadow: boolean, shaded = false) {
     const geo = new THREE.BoxGeometry(1, 1, 1);
     geo.translate(0, 0.5, 0);
+    if (shaded) {
+      // Slightly darker towards the base, a cheap stand-in for bounced light.
+      const p = geo.attributes.position;
+      const colors = new Float32Array(p.count * 3);
+      for (let i = 0; i < p.count; i++) colors.fill(p.getY(i) > 0.5 ? 1 : 0.8, i * 3, i * 3 + 3);
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    }
     const mesh = new THREE.InstancedMesh(geo, material, list.length);
     list.forEach((b, i) => {
-      this.dummy.position.set(b.x, 0, b.z);
+      this.dummy.position.set(b.x, b.y ?? 0, b.z);
       this.dummy.rotation.set(0, -b.rot, 0);
       this.dummy.scale.set(b.w, b.h, b.d);
       this.dummy.updateMatrix();
@@ -343,6 +400,7 @@ export class CityScene {
     const w = Math.max(1, parent.clientWidth);
     const h = Math.max(1, parent.clientHeight);
     this.renderer.setSize(w, h, false);
+    this.composer?.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.needsRender = true;
@@ -382,7 +440,8 @@ export class CityScene {
     }
     this.controls.update();
     if (this.needsRender) {
-      this.renderer.render(this.scene, this.camera);
+      if (this.composer) this.composer.render();
+      else this.renderer.render(this.scene, this.camera);
       this.updatePins();
       this.needsRender = false;
     }
@@ -396,6 +455,7 @@ export class CityScene {
       if (o instanceof THREE.Mesh) o.geometry.dispose();
     });
     Object.values(this.mats).forEach((m) => m.dispose());
+    this.composer?.dispose();
     this.renderer.dispose();
   }
 }

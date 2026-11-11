@@ -9,6 +9,8 @@ export interface Box {
   d: number; // size along local z
   h: number;
   rot: number;
+  /** Height of the base above the valley floor. Defaults to 0. */
+  y?: number;
 }
 
 export interface SampleCity {

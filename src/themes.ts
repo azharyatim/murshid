@@ -30,3 +30,19 @@ export const CLAY: SceneTheme = {
   skyGround: 0xd9dcd8,
   skyIntensity: 1.25,
 };
+
+/** Clay with warm sunlight and cool sky fill, so shadows read blue-grey. */
+export const CLAY_MODEL: SceneTheme = {
+  background: 0xeff0ee,
+  ground: 0xf1f0ed,
+  slab: 0xf4f3f0,
+  building: 0xfcfbf8,
+  haram: 0xffffff,
+  kaabah: 0x161817,
+  node: 0x18794a,
+  sun: 0xfff3df,
+  sunIntensity: 3.1,
+  sky: 0xd3e0ff,
+  skyGround: 0xf2eee8,
+  skyIntensity: 1.2,
+};

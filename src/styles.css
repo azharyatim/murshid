@@ -79,6 +79,17 @@ button:focus-visible {
   touch-action: none;
 }
 
+/* Soft blur at the top and bottom edges gives a miniature-model feel. */
+.tilt-shift {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 24%, transparent 74%, #000 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 24%, transparent 74%, #000 100%);
+}
+
 .pins {
   position: absolute;
   inset: 0;
@@ -340,4 +351,16 @@ h1 {
   font-weight: 650;
   font-size: 15px;
   white-space: nowrap;
+}
+
+/* Layering on the map: canvas, then edge blur, then pins and controls. */
+.tilt-shift {
+  z-index: 1;
+}
+
+.pins,
+.miqat,
+.map-controls,
+.notice {
+  z-index: 2;
 }

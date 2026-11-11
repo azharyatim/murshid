@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { CityScene, type Pin } from './scene/CityScene';
-import { CLAY } from './themes';
+import { CityScene, type Look, type Pin } from './scene/CityScene';
+import { CLAY, CLAY_MODEL } from './themes';
 import { MARWA, SAFA, STEPS } from './data/steps';
 
 // The overview screen: an aerial map of the Haram with a numbered pin for
@@ -12,6 +12,10 @@ const PLACES: { name: string; pos: [number, number] }[] = [
   { name: 'Safa', pos: SAFA },
   { name: 'Marwa', pos: MARWA },
 ];
+
+// The plain look stays the default until the model look is approved.
+// Add ?look=model to the address to see the mockup.
+const LOOK: Look = new URLSearchParams(window.location.search).get('look') === 'model' ? 'model' : 'plain';
 
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);
@@ -25,7 +29,7 @@ export function App() {
     if (!canvas) return;
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     const points = [...MAP_STEPS.map((s) => s.pos!), ...PLACES.map((p) => p.pos)];
-    const scene = new CityScene(canvas, CLAY, mq.matches, points);
+    const scene = new CityScene(canvas, LOOK === 'model' ? CLAY_MODEL : CLAY, mq.matches, points, LOOK);
     const pins: Pin[] = [];
     MAP_STEPS.forEach((s) => pins.push({ el: pinEls.current.get(`step-${s.n}`)!, pos: s.pos! }));
     PLACES.forEach((p) => pins.push({ el: pinEls.current.get(`place-${p.name}`)!, pos: p.pos }));
@@ -55,7 +59,7 @@ export function App() {
   const step = STEPS.find((s) => s.n === selected) ?? null;
 
   return (
-    <div className="app">
+    <div className="app" data-look={LOOK}>
       <div className="stage">
         <canvas ref={canvasRef} aria-hidden="true" />
 
@@ -114,7 +118,12 @@ export function App() {
           </button>
         </div>
 
-        <p className="notice">Placeholder city. Pin positions are approximate.</p>
+        {LOOK === 'model' && <div className="tilt-shift" aria-hidden="true" />}
+        <p className="notice">
+          {LOOK === 'model'
+            ? 'Illustrative hills and buildings, not real map data.'
+            : 'Placeholder city. Pin positions are approximate.'}
+        </p>
       </div>
 
       <main className="sheet">

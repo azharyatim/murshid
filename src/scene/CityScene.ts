@@ -14,7 +14,48 @@ import { generateModelCity, terrainHeight } from './modelCity';
  * 'model' adds hills, an irregular city, warm light with cool shadows and
  * ambient occlusion, to read like a physical clay site model.
  */
-export type Look = 'plain' | 'model';
+export type Look = 'plain' | 'model' | 'cyan';
+
+/**
+ * Draws rows of windows on building walls inside the material's shader.
+ * No extra geometry or textures are used, so the cost is close to nothing.
+ * Windows fade out when they become smaller than a pixel, to avoid shimmer.
+ */
+function addWindows(material: THREE.MeshStandardMaterial) {
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWin;')
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        #ifdef USE_INSTANCING
+          vec3 winScale = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
+          float alongWall = abs(normal.x) > 0.5 ? position.z * winScale.z : position.x * winScale.x;
+          float wallWidth = abs(normal.x) > 0.5 ? winScale.z : winScale.x;
+          // x: metres along the wall from its centre, y: metres up, z: wall width (0 on roofs)
+          vWin = vec3(alongWall, position.y * winScale.y, abs(normal.y) > 0.5 ? 0.0 : wallWidth);
+        #else
+          vWin = vec3(0.0);
+        #endif`,
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWin;')
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        if (vWin.z > 0.0) {
+          const vec2 cell = vec2(4.2, 3.6); // window spacing and floor height in metres
+          vec2 g = vec2(vWin.x + vWin.z * 0.5, vWin.y - 4.5) / cell;
+          vec2 f = fract(g);
+          float win = step(0.22, f.x) * step(f.x, 0.78) * step(0.28, f.y) * step(f.y, 0.8);
+          // Keep a plain band at the base, the top and the corners.
+          win *= step(0.0, g.y) * step(abs(vWin.x), vWin.z * 0.5 - 1.2);
+          float detail = 1.0 - clamp(max(fwidth(g.x), fwidth(g.y)) * 1.6, 0.0, 1.0);
+          diffuseColor.rgb *= 1.0 - 0.24 * win * detail;
+        }`,
+      );
+  };
+}
 
 const NODE_COUNT = 150;
 const MATAF_RADIUS = 68;
@@ -88,7 +129,7 @@ export class CityScene {
     private look: Look = 'plain',
   ) {
     this.reducedMotion = reducedMotion;
-    const model = look === 'model';
+    const model = look !== 'plain';
     const small = Math.min(window.innerWidth, window.innerHeight) < 700;
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -129,6 +170,7 @@ export class CityScene {
     if (model) {
       this.scene.add(this.buildTerrain());
       this.mats.building.vertexColors = true;
+      if (look === 'cyan') addWindows(this.mats.building);
       this.scene.add(this.boxes(generateModelCity(), this.mats.building, true, true));
     } else {
       const ground = new THREE.Mesh(new THREE.CircleGeometry(4000, 64), this.mats.ground);

@@ -46,3 +46,19 @@ export const CLAY_MODEL: SceneTheme = {
   skyGround: 0xf2eee8,
   skyIntensity: 1.2,
 };
+
+/** Cyan buildings on light grey ground, after the isometric reference image. */
+export const CLAY_CYAN: SceneTheme = {
+  background: 0xe4e6e9,
+  ground: 0xd3d6da,
+  slab: 0xdfe1e4,
+  building: 0x58d0d2,
+  haram: 0xffffff,
+  kaabah: 0x161817,
+  node: 0xe8771a,
+  sun: 0xfffaf0,
+  sunIntensity: 2.6,
+  sky: 0xe4ecff,
+  skyGround: 0xeeeeee,
+  skyIntensity: 1.3,
+};

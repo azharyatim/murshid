@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CityScene, type Look, type Pin } from './scene/CityScene';
-import { CLAY, CLAY_MODEL } from './themes';
+import { CLAY, CLAY_CYAN, CLAY_MODEL } from './themes';
 import { MARWA, SAFA, STEPS } from './data/steps';
 
 // The overview screen: an aerial map of the Haram with a numbered pin for
@@ -14,8 +14,10 @@ const PLACES: { name: string; pos: [number, number] }[] = [
 ];
 
 // The plain look stays the default until the model look is approved.
-// Add ?look=model to the address to see the mockup.
-const LOOK: Look = new URLSearchParams(window.location.search).get('look') === 'model' ? 'model' : 'plain';
+// Add ?look=model or ?look=cyan to the address to see the mockups.
+const LOOK_PARAM = new URLSearchParams(window.location.search).get('look');
+const LOOK: Look = LOOK_PARAM === 'model' || LOOK_PARAM === 'cyan' ? LOOK_PARAM : 'plain';
+const SCENE_THEME = { plain: CLAY, model: CLAY_MODEL, cyan: CLAY_CYAN }[LOOK];
 
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);
@@ -29,7 +31,7 @@ export function App() {
     if (!canvas) return;
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     const points = [...MAP_STEPS.map((s) => s.pos!), ...PLACES.map((p) => p.pos)];
-    const scene = new CityScene(canvas, LOOK === 'model' ? CLAY_MODEL : CLAY, mq.matches, points, LOOK);
+    const scene = new CityScene(canvas, SCENE_THEME, mq.matches, points, LOOK);
     const pins: Pin[] = [];
     MAP_STEPS.forEach((s) => pins.push({ el: pinEls.current.get(`step-${s.n}`)!, pos: s.pos! }));
     PLACES.forEach((p) => pins.push({ el: pinEls.current.get(`place-${p.name}`)!, pos: p.pos }));
@@ -119,7 +121,7 @@ export function App() {
         </div>
 
         <p className="notice">
-          {LOOK === 'model'
+          {LOOK !== 'plain'
             ? 'Illustrative hills and buildings, not real map data.'
             : 'Placeholder city. Pin positions are approximate.'}
         </p>

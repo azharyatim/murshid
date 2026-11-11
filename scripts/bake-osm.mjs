@@ -6,7 +6,7 @@
 // footprint: x = east, z = south. Heights come from the `height` tag, then
 // `building:levels`, and otherwise are ESTIMATED; estimated buildings carry
 // `est: 1` so the app can say so.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const name = process.argv[2];
 if (!name) {
@@ -97,11 +97,26 @@ function inside(p, ring) {
 
 // A height above this on a whole multipolygon is the tallest tower of a
 // complex (the Clock Towers are tagged 601 m), not the height of every part.
-// Such footprints get an estimated podium height until building parts are baked.
+// Such footprints get an estimated podium height unless building parts replace them.
 const COMPLEX_HEIGHT = 300;
 
-const buildings = [];
-let estimated = 0;
+/** Outer and inner rings (lat/lon) of a way or multipolygon. */
+function ringsOf(e) {
+  if (e.type === 'way') return { outer: e.geometry.length >= 4 ? [e.geometry] : [], inner: [] };
+  return {
+    outer: assemble(e.members.filter((m) => m.role === 'outer' && m.geometry).map((m) => m.geometry)),
+    inner: assemble(e.members.filter((m) => m.role === 'inner' && m.geometry).map((m) => m.geometry)),
+  };
+}
+const centre = (ring) => ({
+  lat: ring.reduce((s, p) => s + p.lat, 0) / ring.length,
+  lon: ring.reduce((s, p) => s + p.lon, 0) / ring.length,
+});
+
+// 1. Building outlines.
+const footprints = [];
+// The Kaabah is drawn separately; listed here only so parts inside it are ignored.
+footprints.push({ simple: true, hidden: true, outer: kaabah.geometry, holes: [] });
 for (const e of els) {
   const t = e.tags ?? {};
   if (!t.building || e.id === KAABAH_WAY) continue;
@@ -110,28 +125,60 @@ for (const e of els) {
     h = ESTIMATE.default;
     est = true;
   }
-  const min = minHeightOf(t);
-  let outer = [];
-  let inner = [];
-  if (e.type === 'way') {
-    if (e.geometry.length >= 4) outer = [e.geometry];
-  } else {
-    outer = assemble(e.members.filter((m) => m.role === 'outer' && m.geometry).map((m) => m.geometry));
-    inner = assemble(e.members.filter((m) => m.role === 'inner' && m.geometry).map((m) => m.geometry));
-  }
-  if (!outer.length) continue;
+  const { outer, inner } = ringsOf(e);
   // Maqam Ibrahim and the Hijr Isma'il wall are drawn as part of the mosque, not as city buildings.
-  const partOfHaram = e.id === HARAM_RELATION || HARAM_FEATURES.includes(t.wikidata);
-  const kind = partOfHaram ? 'haram' : t.building === 'roof' ? 'roof' : 'building';
+  const special = HARAM_FEATURES.includes(t.wikidata);
+  const kind = e.id === HARAM_RELATION || special ? 'haram' : t.building === 'roof' ? 'roof' : 'building';
   for (const o of outer) {
-    const holes = inner.filter((r) => inside(r[0], o));
-    const b = { kind, h: r1(h), rings: [flat(o), ...holes.map(flat)] };
-    if (min > 0) b.min = r1(min);
-    if (est) b.est = 1;
-    buildings.push(b);
+    // `simple`: kept as plain massing even if detailed parts exist inside it.
+    footprints.push({ kind, h, est, min: minHeightOf(t), outer: o, holes: inner.filter((r) => inside(r[0], o)), simple: special });
   }
-  if (est) estimated++;
 }
+
+// 2. Building parts (optional second export, data/raw/<name>-parts.json).
+// Following the usual OpenStreetMap 3D rule, an outline that contains parts is
+// replaced by its parts, which carry their own heights (towers, spires, domes).
+const parts = [];
+const partsFile = `data/raw/${name}-parts.json`;
+if (existsSync(partsFile)) {
+  for (const e of JSON.parse(readFileSync(partsFile, 'utf8')).elements) {
+    const t = e.tags ?? {};
+    if (!t['building:part']) continue;
+    const { outer, inner } = ringsOf(e);
+    for (const o of outer) {
+      const c = centre(o.slice(0, -1));
+      const host = footprints.find((f) => inside(c, f.outer) && !f.holes.some((hole) => inside(c, hole)));
+      if (host?.simple) continue;
+      if (host) host.replaced = true;
+      // A ring-shaped part (such as a gallery around the mataf) has its centre in
+      // the courtyard, so also count it as the mosque if it lies within the outline.
+      const inHaram = host?.kind === 'haram' || footprints.some((f) => f.kind === 'haram' && !f.simple && inside(c, f.outer));
+      const { h, est } = heightOf(t);
+      parts.push({
+        kind: inHaram ? 'haram' : 'building',
+        h,
+        est,
+        min: minHeightOf(t),
+        outer: o,
+        holes: inner.filter((r) => inside(r[0], o)),
+      });
+    }
+  }
+}
+
+const buildings = [];
+let estimated = 0;
+for (const f of [...footprints.filter((f) => !f.replaced && !f.hidden), ...parts]) {
+  if (f.h <= f.min) continue;
+  const b = { kind: f.kind, h: r1(f.h), rings: [flat(f.outer), ...f.holes.map(flat)] };
+  if (f.min > 0) b.min = r1(f.min);
+  if (f.est) {
+    b.est = 1;
+    estimated++;
+  }
+  buildings.push(b);
+}
+const replacedCount = footprints.filter((f) => f.replaced).length;
 
 // Roads: widths in metres by type, roughly; drawn as flat ribbons.
 const ROAD_WIDTH = {
@@ -177,5 +224,5 @@ const out = {
 };
 mkdirSync('public/data', { recursive: true });
 writeFileSync(`public/data/${name}.json`, JSON.stringify(out));
-console.log(`${name}: ${buildings.length} building shapes (${estimated} with estimated height), ${roads.length} roads`);
+console.log(`${name}: ${buildings.length} shapes (${parts.length} detailed parts replacing ${replacedCount} outlines; ${estimated} with estimated height), ${roads.length} roads`);
 console.log('landmarks', JSON.stringify({ ...landmarks, kaabah: undefined }));

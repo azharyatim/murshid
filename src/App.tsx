@@ -143,7 +143,7 @@ export function App() {
 
         <p className="notice">
           {city
-            ? 'Map © OpenStreetMap. Most heights estimated.'
+            ? 'Map © OpenStreetMap. Some heights estimated.'
             : LOOK !== 'plain'
               ? 'Illustrative hills and buildings, not real map data.'
               : 'Placeholder city. Pin positions are approximate.'}

@@ -136,8 +136,9 @@ Ask these first. They were the last things put to the owner and none has been an
 The owner downloaded the OpenStreetMap export by hand through Overpass Turbo; the direct Overpass link returned 406 in their browser, and the servers are still unreachable from the sessions. The raw file is `data/raw/makkah-haram.json` (gitignored; ask the owner to attach it again if it is missing). `node scripts/bake-osm.mjs makkah-haram` turns it into `public/data/makkah-haram.json`, which the app loads.
 
 - Only `?look=cyan-light` (the owner's chosen Option A, with their beige ground #efe6d3) draws the real city. The other looks still show the illustrative city for comparison.
-- The ground is flat: no terrain source yet. Most heights (337 of 428 footprints) are estimates.
-- The Clock Towers relation is tagged 601 m for the whole complex, so it gets an estimated podium height until `building:part` data is downloaded.
+- The owner also supplied the `building:part` export (`data/raw/makkah-haram-parts.json`, gitignored). The bake replaces any outline that contains parts with its parts, so the Clock Towers, hotel towers, minarets and Haram galleries have their mapped heights. The Kaabah, Maqam Ibrahim and Hijr Isma'il stay as simple massing. 349 of 1343 shapes still have estimated heights.
+- The ground is flat: no terrain source yet. Roof shapes (domes, sloping roofs) are drawn flat.
+- In the default tilted view the Clock Tower hides part of the Haram and pin 3. This is real, but how to handle it is a design question for the owner.
 - Safa and Marwa pins now come from the ends of the Mas'a walkway in OSM. The other pins are still placeholders.
 - The accent colour to replace the green is still the owner's decision.
 

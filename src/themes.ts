@@ -74,12 +74,13 @@ export const CLAY_CYAN: SceneTheme = {
 /** Cyan option A: shaded sides lifted so they stay cyan instead of turning teal. */
 export const CLAY_CYAN_LIGHT: SceneTheme = {
   ...CLAY_CYAN,
-  // Warm beige ground picked by the owner (#efe6d3 in their reference image).
-  background: 0xefe6d3,
-  ground: 0xefe6d3,
-  slab: 0xf3ebdb,
-  skyGround: 0xefe6d3,
-  road: 0xe4d8c1,
+  // The owner's beige (#efe6d3 from their reference image), then made 50% lighter
+  // at their request: each colour is halfway between the original and white.
+  background: 0xf7f3e9,
+  ground: 0xf7f3e9,
+  slab: 0xf9f5ed,
+  skyGround: 0xf7f3e9,
+  road: 0xf2ece0,
   sunIntensity: 2.1,
   skyIntensity: 2.0,
   baseShade: 0.93,

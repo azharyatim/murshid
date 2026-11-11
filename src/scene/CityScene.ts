@@ -82,7 +82,12 @@ export interface Pin {
   el: HTMLElement;
   /** Metres from the Kaabah: x = east, z = south. */
   pos: [number, number];
+  /** Height in metres the pin points at: just above whatever stands there. Set by setPins. */
+  y?: number;
 }
+
+/** How often, at most, to test whether buildings hide the pins (ms). Raycasting is not free. */
+const OCCLUSION_INTERVAL = 150;
 
 interface Flight {
   fromPos: THREE.Vector3;
@@ -125,6 +130,12 @@ export class CityScene {
   private reducedMotion: boolean;
   private resizeObserver: ResizeObserver;
   private tmp = new THREE.Vector3();
+  /** Meshes that can hide a pin: buildings, the Haram, the Kaabah and hills. */
+  private occluders: THREE.Object3D[] = [];
+  private raycaster = new THREE.Raycaster();
+  private lastCamera = new THREE.Matrix4();
+  private occlusionDirty = true;
+  private lastOcclusion = 0;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -240,6 +251,7 @@ export class CityScene {
     }
     this.placeNodes();
     this.scene.add(this.nodeMesh);
+    this.occluders = this.scene.children.filter((o) => o instanceof THREE.Mesh && o.castShadow && o !== this.nodeMesh);
 
     // Frame for the default aerial view.
     const box = new THREE.Box3();
@@ -412,7 +424,16 @@ export class CityScene {
   }
 
   setPins(pins: Pin[]) {
+    // Point each pin just above the top of whatever stands at its position.
+    this.scene.updateMatrixWorld();
+    for (const pin of pins) {
+      this.raycaster.set(this.tmp.set(pin.pos[0], 3000, pin.pos[1]), new THREE.Vector3(0, -1, 0));
+      this.raycaster.far = Infinity;
+      const top = this.raycaster.intersectObjects(this.occluders, false)[0]?.point.y ?? 0;
+      pin.y = Math.max(26, top + 3);
+    }
     this.pins = pins;
+    this.occlusionDirty = true;
     this.needsRender = true;
   }
 
@@ -492,13 +513,27 @@ export class CityScene {
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
     for (const pin of this.pins) {
-      this.tmp.set(pin.pos[0], 26, pin.pos[1]).project(this.camera);
+      this.tmp.set(pin.pos[0], pin.y ?? 26, pin.pos[1]).project(this.camera);
       const visible = this.tmp.z < 1 && Math.abs(this.tmp.x) < 1.2 && Math.abs(this.tmp.y) < 1.2;
       pin.el.style.visibility = visible ? 'visible' : 'hidden';
       if (!visible) continue;
       const x = (this.tmp.x * 0.5 + 0.5) * w;
       const y = (-this.tmp.y * 0.5 + 0.5) * h;
       pin.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+    }
+  }
+
+  /** Marks pins that a building stands in front of, so they can be drawn faded. */
+  private updateOcclusion() {
+    const from = this.camera.position;
+    const dir = new THREE.Vector3();
+    for (const pin of this.pins) {
+      const to = this.tmp.set(pin.pos[0], pin.y ?? 26, pin.pos[1]);
+      const dist = from.distanceTo(to);
+      this.raycaster.set(from, dir.subVectors(to, from).normalize());
+      this.raycaster.far = dist - 1.5;
+      const hidden = this.raycaster.intersectObjects(this.occluders, false).length > 0;
+      pin.el.classList.toggle('is-occluded', hidden);
     }
   }
 
@@ -521,6 +556,16 @@ export class CityScene {
       this.needsRender = true;
     }
     this.controls.update();
+    this.camera.updateMatrixWorld();
+    if (!this.lastCamera.equals(this.camera.matrixWorld)) {
+      this.lastCamera.copy(this.camera.matrixWorld);
+      this.occlusionDirty = true;
+    }
+    if (this.occlusionDirty && time - this.lastOcclusion > OCCLUSION_INTERVAL) {
+      this.lastOcclusion = time;
+      this.occlusionDirty = false;
+      this.updateOcclusion();
+    }
     if (this.needsRender) {
       if (this.composer) this.composer.render();
       else this.renderer.render(this.scene, this.camera);

@@ -7,6 +7,9 @@
   --line: #dde1dd;
   --accent: #18794a;
   --accent-ink: #ffffff;
+  /* Map pins: softer than the near-black ink, still 3:1 against white for the border. */
+  --pin-line: #7f8a85;
+  --pin-ink: #3b4440;
   --font-body: 'Hanken Grotesk Variable', system-ui, sans-serif;
   --font-arabic: 'Noto Naskh Arabic Variable', serif;
 }
@@ -120,11 +123,13 @@ button:focus-visible {
   place-items: center;
   border-radius: 50%;
   background: var(--sheet);
-  border: 2px solid var(--ink);
+  border: 2px solid var(--pin-line);
+  color: var(--pin-ink);
   font-weight: 700;
   font-size: 15px;
   line-height: 1;
-  box-shadow: 0 2px 6px rgba(22, 26, 24, 0.25);
+  box-shadow: 0 1px 4px rgba(22, 26, 24, 0.14);
+  transition: opacity 0.2s;
 }
 
 /* Stem */
@@ -135,7 +140,30 @@ button:focus-visible {
   bottom: 0;
   width: 2px;
   height: 10px;
-  background: var(--ink);
+  background: var(--pin-line);
+}
+
+/* A building stands between the viewer and the pin: fade it and dot the border. */
+.pin.is-occluded .pin-badge {
+  opacity: 0.6;
+  border-style: dotted;
+  box-shadow: none;
+}
+
+.pin.is-occluded::before {
+  background: none;
+  border-left: 2px dotted var(--pin-line);
+  opacity: 0.6;
+}
+
+.place.is-occluded span {
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin-badge {
+    transition: none;
+  }
 }
 
 .pin.is-on .pin-badge {
@@ -198,7 +226,8 @@ button:focus-visible {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--pin-line);
+  color: var(--pin-ink);
   font-style: normal;
   font-weight: 700;
   font-size: 14px;

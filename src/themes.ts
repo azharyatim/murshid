@@ -149,7 +149,7 @@ export const CLAY_NIGHT: SceneTheme = {
   skyGround: 0x1e2a47,
   sky: 0x3b5a9a,
   building: 0x34456f,
-  haram: 0xb9b4a6,
+  haram: 0x5eaabd,
   kaabah: 0x05070c,
   node: 0xffc94d,
   sun: 0xffe2b0,
@@ -158,5 +158,25 @@ export const CLAY_NIGHT: SceneTheme = {
   shadowStrength: 0.7,
   baseShade: 0.85,
   buildingGlow: 0.22,
-  haramGlow: 0.4, // the Haram floor, a soft warm stone
+  haramGlow: 0.15, // the teal Haram floor, lit
+};
+
+/**
+ * Day: the Night Tawaf colours turned around. Pale cool ground and buildings, the same
+ * teal Haram and black Kaabah, midnight-blue pilgrims (gold is too weak on teal in daylight).
+ * Interface colours are in styles.css under data-palette="day".
+ */
+export const CLAY_DAY: SceneTheme = {
+  ...CLAY_CYAN_LIGHT,
+  background: 0xe6ecef,
+  ground: 0xdce4ea,
+  slab: 0xe3eaef,
+  road: 0xcbd5df,
+  skyGround: 0xdce4ea,
+  sky: 0xe4ecff,
+  building: 0xc3d0e0,
+  haram: 0x5eaabd,
+  kaabah: 0x05070c,
+  node: 0x0d1424,
+  shadowStrength: 0.6,
 };

@@ -6,6 +6,7 @@ import {
   CLAY_CYAN_FLAT,
   CLAY_CYAN_GREY,
   CLAY_CYAN_LIGHT,
+  CLAY_DAY,
   CLAY_GREEN,
   CLAY_MODEL,
   CLAY_NIGHT,
@@ -24,11 +25,13 @@ const PLACES: { name: string; pos: [number, number] }[] = [
   { name: 'Marwa', pos: MARWA },
 ];
 
-// Night Tawaf is the default look. ?look=plain, model, cyan and the others stay available to compare.
+// Night Tawaf and its Day twin are the main looks. ?look=plain, model, cyan and the others stay available to compare.
 // Add ?look=model or ?look=cyan to the address to see the mockups.
 // ?look=cyan-light and ?look=cyan-flat are two ways of keeping the cyan from turning teal.
 // A build can choose the look that opens by default with VITE_DEFAULT_LOOK (used for preview pages).
-const LOOK_PARAM = new URLSearchParams(window.location.search).get('look') ?? import.meta.env.VITE_DEFAULT_LOOK ?? 'night';
+const LOOK_PARAM = new URLSearchParams(window.location.search).get('look') ?? import.meta.env.VITE_DEFAULT_LOOK ??
+  // Day or night follows the phone's light/dark setting unless ?look= says otherwise.
+  (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'day');
 const THEMES = {
   plain: CLAY,
   model: CLAY_MODEL,
@@ -39,18 +42,20 @@ const THEMES = {
   'cyan-grey': CLAY_CYAN_GREY,
   'clay-grey': CLAY_PLAIN_GREY,
   night: CLAY_NIGHT,
+  day: CLAY_DAY,
 } as const;
 const LOOK_KEY = (LOOK_PARAM in THEMES ? LOOK_PARAM : 'plain') as keyof typeof THEMES;
 // Every cyan option and the green look use the 'cyan' scene setup (lighting, drawn windows).
 const LOOK: Look =
-  LOOK_KEY.startsWith('cyan') || LOOK_KEY === 'green' || LOOK_KEY === 'night' ? 'cyan' : LOOK_KEY === 'clay-grey' ? 'plain' : (LOOK_KEY as Look);
+  LOOK_KEY.startsWith('cyan') || LOOK_KEY === 'green' || LOOK_KEY === 'night' || LOOK_KEY === 'day' ? 'cyan' : LOOK_KEY === 'clay-grey' ? 'plain' : (LOOK_KEY as Look);
 const SCENE_THEME = THEMES[LOOK_KEY];
 // The interface colours follow the look (see data-palette in styles.css).
 document.documentElement.dataset.palette = LOOK_KEY;
-if (LOOK_KEY === 'night') document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0d1424');
+if (LOOK_KEY === 'night' || LOOK_KEY === 'day')
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', LOOK_KEY === 'night' ? '#0d1424' : '#e6ecef');
 // Option A (cyan-light), green, cyan-grey and clay-grey are drawn on real OpenStreetMap data; the other looks
 // keep the illustrative city so they can still be compared.
-const REAL_CITY = ['cyan-light', 'green', 'cyan-grey', 'clay-grey', 'night'].includes(LOOK_KEY);
+const REAL_CITY = ['cyan-light', 'green', 'cyan-grey', 'clay-grey', 'night', 'day'].includes(LOOK_KEY);
 
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);

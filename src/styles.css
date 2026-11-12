@@ -30,6 +30,19 @@
   --pin-ink: #eef1f7;
 }
 
+/* Day: the night palette turned around. Midnight blue becomes the text colour. */
+:root[data-palette='day'] {
+  --bg: #e6ecef;
+  --sheet: #ffffff;
+  --ink: #0d1424;
+  --muted: #4a5873;
+  --line: #d3dbe4;
+  --accent: #8a5a00;
+  --accent-ink: #ffffff;
+  --pin-line: #6b7c99;
+  --pin-ink: #1e2a47;
+}
+
 * {
   box-sizing: border-box;
 }

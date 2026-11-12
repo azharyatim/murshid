@@ -149,7 +149,7 @@ export const CLAY_NIGHT: SceneTheme = {
   skyGround: 0x1e2a47,
   sky: 0x3b5a9a,
   building: 0x34456f,
-  haram: 0x6f86b8,
+  haram: 0xb9b4a6,
   kaabah: 0x05070c,
   node: 0xffc94d,
   sun: 0xffe2b0,
@@ -158,5 +158,5 @@ export const CLAY_NIGHT: SceneTheme = {
   shadowStrength: 0.7,
   baseShade: 0.85,
   buildingGlow: 0.22,
-  haramGlow: 0.15, // the Haram floor, a lit blue that belongs to the night palette
+  haramGlow: 0.4, // the Haram floor, a soft warm stone
 };

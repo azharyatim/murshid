@@ -8,6 +8,7 @@ import {
   CLAY_CYAN_LIGHT,
   CLAY_GREEN,
   CLAY_MODEL,
+  CLAY_NIGHT,
   CLAY_PLAIN_GREY,
 } from './themes';
 import { MARWA, SAFA, STEPS } from './data/steps';
@@ -23,11 +24,11 @@ const PLACES: { name: string; pos: [number, number] }[] = [
   { name: 'Marwa', pos: MARWA },
 ];
 
-// The plain look stays the default until the model look is approved.
+// Night Tawaf is the default look. ?look=plain, model, cyan and the others stay available to compare.
 // Add ?look=model or ?look=cyan to the address to see the mockups.
 // ?look=cyan-light and ?look=cyan-flat are two ways of keeping the cyan from turning teal.
 // A build can choose the look that opens by default with VITE_DEFAULT_LOOK (used for preview pages).
-const LOOK_PARAM = new URLSearchParams(window.location.search).get('look') ?? import.meta.env.VITE_DEFAULT_LOOK ?? '';
+const LOOK_PARAM = new URLSearchParams(window.location.search).get('look') ?? import.meta.env.VITE_DEFAULT_LOOK ?? 'night';
 const THEMES = {
   plain: CLAY,
   model: CLAY_MODEL,
@@ -37,15 +38,19 @@ const THEMES = {
   green: CLAY_GREEN,
   'cyan-grey': CLAY_CYAN_GREY,
   'clay-grey': CLAY_PLAIN_GREY,
+  night: CLAY_NIGHT,
 } as const;
 const LOOK_KEY = (LOOK_PARAM in THEMES ? LOOK_PARAM : 'plain') as keyof typeof THEMES;
 // Every cyan option and the green look use the 'cyan' scene setup (lighting, drawn windows).
 const LOOK: Look =
-  LOOK_KEY.startsWith('cyan') || LOOK_KEY === 'green' ? 'cyan' : LOOK_KEY === 'clay-grey' ? 'plain' : (LOOK_KEY as Look);
+  LOOK_KEY.startsWith('cyan') || LOOK_KEY === 'green' || LOOK_KEY === 'night' ? 'cyan' : LOOK_KEY === 'clay-grey' ? 'plain' : (LOOK_KEY as Look);
 const SCENE_THEME = THEMES[LOOK_KEY];
+// The interface colours follow the look (see data-palette in styles.css).
+document.documentElement.dataset.palette = LOOK_KEY;
+if (LOOK_KEY === 'night') document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0d1424');
 // Option A (cyan-light), green, cyan-grey and clay-grey are drawn on real OpenStreetMap data; the other looks
 // keep the illustrative city so they can still be compared.
-const REAL_CITY = ['cyan-light', 'green', 'cyan-grey', 'clay-grey'].includes(LOOK_KEY);
+const REAL_CITY = ['cyan-light', 'green', 'cyan-grey', 'clay-grey', 'night'].includes(LOOK_KEY);
 
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);

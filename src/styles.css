@@ -16,6 +16,20 @@
   --font-arabic: 'Noto Naskh Arabic Variable', serif;
 }
 
+/* Night Tawaf: dark interface to match the night map. */
+:root[data-palette='night'] {
+  color-scheme: dark;
+  --bg: #0d1424;
+  --sheet: #151f36;
+  --ink: #eef1f7;
+  --muted: #a3aec6;
+  --line: #26324f;
+  --accent: #f0be4d;
+  --accent-ink: #1a1405;
+  --pin-line: #8a99ba;
+  --pin-ink: #eef1f7;
+}
+
 * {
   box-sizing: border-box;
 }

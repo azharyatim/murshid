@@ -417,6 +417,7 @@ export class CityScene {
     if (t.buildingEmissive !== undefined) this.mats.building.emissive.set(t.buildingEmissive);
     else this.mats.building.emissive.set(t.building).multiplyScalar(t.buildingGlow ?? 0);
     this.mats.haram.color.set(t.haram);
+    this.mats.haram.emissive.set(t.haram).multiplyScalar(t.haramGlow ?? 0);
     this.mats.kaabah.color.set(t.kaabah);
     this.mats.node.color.set(t.node);
     this.sun.color.set(t.sun);

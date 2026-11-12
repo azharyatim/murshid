@@ -22,6 +22,8 @@ export interface SceneTheme {
   buildingEmissive?: number;
   /** Road colour on real map data. Defaults to the slab colour. */
   road?: number;
+  /** How much of the Haram's colour shows regardless of light, 0 to 1. Default 0. */
+  haramGlow?: number;
   /** How dark cast shadows are, 0 (none) to 1 (full). Default 1. */
   shadowStrength?: number;
 }
@@ -132,3 +134,29 @@ export const CLAY_CYAN_GREY: SceneTheme = { ...CLAY_CYAN_LIGHT, ...LIGHT_GREY_GR
 
 /** The first plain Clay look (white buildings, simple lighting) on the light grey ground. */
 export const CLAY_PLAIN_GREY: SceneTheme = { ...CLAY, ...LIGHT_GREY_GROUND, node: 0xe8771a }; // orange nodes to match the orange accent
+
+/**
+ * Night Tawaf: the Haram at night under floodlights. Midnight-blue ground, slate-blue
+ * city, warm marble floor around the Kaabah, lamp-gold pilgrims. Dark-first.
+ * The interface colours for this look are in styles.css under data-palette="night".
+ */
+export const CLAY_NIGHT: SceneTheme = {
+  ...CLAY_CYAN_LIGHT,
+  background: 0x0d1424,
+  ground: 0x1e2a47,
+  slab: 0x26345a,
+  road: 0x2c3b66,
+  skyGround: 0x1e2a47,
+  sky: 0x3b5a9a,
+  building: 0x34456f,
+  haram: 0xd9d4c7,
+  kaabah: 0x05070c,
+  node: 0xffc94d,
+  sun: 0xffe2b0,
+  sunIntensity: 1.5,
+  skyIntensity: 1.1,
+  shadowStrength: 0.7,
+  baseShade: 0.85,
+  buildingGlow: 0.22,
+  haramGlow: 0.7, // the floodlit marble
+};

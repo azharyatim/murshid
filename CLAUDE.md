@@ -6,6 +6,6 @@ Standing rules:
 
 - Never write a dua, verse or hadith from memory. Use the Quran and Hadith MCP tools, after fetching each one's grounding rules.
 - Build in stages and wait for the owner's approval between them.
-- Mobile only: test and screenshot at a 390px-wide viewport, and send the screenshots to the owner.
+- Mobile only: test at a 390px-wide viewport. Do not send screenshots unless the owner asks; after each change, update the private preview page and give the owner its link: https://claude.ai/artifact/TVMByBrJu5m5qKzZiPbjGL
 - Say plainly what is real and what is placeholder.
 - The owner is a UX designer, not a developer. Explain in plain language.

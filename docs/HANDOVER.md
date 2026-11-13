@@ -12,8 +12,9 @@ The repository is `azharyatim/murshid`, branch `main`. Work has been committed s
 
 These came from the owner's original brief and from how the session went. Treat them as standing rules.
 
-- **Build in stages and stop for approval.** Show screenshots at the end of each stage and wait. Do not run ahead into the next stage.
-- **Mobile only.** Test and screenshot at a 390px-wide viewport. The owner explicitly dropped desktop mockups. On wide screens the mobile layout is simply centred.
+- **Build in stages and stop for approval.** Update the preview page at the end of each stage and wait. Do not run ahead into the next stage.
+- **Mobile only.** Test at a 390px-wide viewport. The owner explicitly dropped desktop mockups. On wide screens the mobile layout is simply centred.
+- **Show work through the preview page, not screenshots** (owner's request, 13 November 2026). After each change, rebuild and republish the private preview page (see "Private preview page") and give the owner the link. Send screenshots only when they ask.
 - **Ask before deciding anything religious or visual.** Ask questions in batches of at most four. Where scholars differ, say so and let the owner (and later the app's user) choose.
 - **Explain in plain language.** No jargon without a gloss. The owner asked the previous session to choose the tech stack for them.
 - **Say what is real and what is placeholder.** The owner has been told, on screen and in chat, whenever something is illustrative. Keep that up; it is why they trust the screenshots.

@@ -165,9 +165,10 @@ The owner reviews on their phone through a private Claude page: https://claude.a
 ## Scope change: Makkah and Madinah guide (owner's decisions)
 
 - The app is now **Murshid: Umrah and Madinah Guide**. It shows the usual places of interest around Makkah and Madinah as well as the Umrah steps.
-- **Navigation:** the default view shows both cities on one map; people zoom in and out to move between them. There are no tabs or home screen for now.
+- **Navigation:** the default view shows Makkah and Madinah on one map; people zoom in and out to move between them. There are no tabs or home screen for now.
 - **Far places** (Arafah, Jabal al-Nur, Uhud, Quba...) appear on a flat regional map with pins. The detailed 3D city is only around the Haram and the Prophet's Mosque. 3D around each place is a possible later feature.
 - **Order:** places come next, before stage 2 (steps and duas). The owner approves the place list first: draft in `docs/places-draft.md`.
+- **Place list merged** with the owner's own list (13 Nov 2026), which added Taif (Masjid Abdullah ibn Abbas, rose farms and factory), Badr, a date farm, Jabal al-Rumah and al-Hudaybiyah. The opening map shows Makkah and Madinah only; Taif and Badr are reached by zooming or dragging. Place names show the standard English spelling with the owner's spelling in brackets, e.g. "Jabal Thawr (Jabal Tsur)".
 - The Madinah 3D core needs the same two OpenStreetMap downloads as Makkah (buildings and roads, then building parts), centred on the Prophet's Mosque.
 
 ## Later feature ideas from the owner (not scheduled)

@@ -1,17 +1,19 @@
 /* Clay style tokens. Further design direction comes later. */
 :root {
-  --bg: #eef0ed;
+  /* Murshid "Day" colours (owner's scheme, matches data-palette='day' on
+     branch claude/admiring-johnson-oalgb6). Use only these values. */
+  --bg: #e6ecef;
   --sheet: #ffffff;
-  --ink: #161a18;
-  --muted: #58605b;
-  --line: #dde1dd;
+  --ink: #0d1424;
+  --muted: #4a5873;
+  --line: #d3dbe4;
   /* Orange, chosen by the owner. Deeper than the map's #e8771a nodes so white
      text on it reaches 4.9:1 contrast (the node orange gives only 3:1). */
-  --accent: #b8520b;
+  --accent: #8a5a00;
   --accent-ink: #ffffff;
   /* Map pins: softer than the near-black ink, still 3:1 against white for the border. */
-  --pin-line: #7f8a85;
-  --pin-ink: #3b4440;
+  --pin-line: #6b7c99;
+  --pin-ink: #1e2a47;
   --font-body: 'Hanken Grotesk Variable', system-ui, sans-serif;
   --font-arabic: 'Noto Naskh Arabic Variable', serif;
 }
@@ -130,7 +132,7 @@ button:focus-visible {
   font-weight: 700;
   font-size: 15px;
   line-height: 1;
-  box-shadow: 0 1px 4px rgba(22, 26, 24, 0.14);
+  box-shadow: 0 1px 4px rgba(13, 20, 36, 0.14); /* soft, cool: midnight #0d1424, not black */
   transition: opacity 0.2s;
 }
 

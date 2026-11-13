@@ -147,9 +147,19 @@ The owner downloaded the OpenStreetMap export by hand through Overpass Turbo; th
 - The interface accent is now orange `#b8520b` (owner's choice). It is deeper than the map's `#e8771a` nodes so white text on it reaches 4.9:1; the node orange would give only 3:1.
 - `?look=cyan-grey` (option A cyan on light grey ground) and `?look=clay-grey` (the first plain Clay look on light grey ground, with orange nodes) were added for comparison. Both use the real city. Comparison images are in `docs/grey-ground/`.
 
+## Colour scheme: Murshid "Day" (current default)
+
+The owner supplied the Day scheme on 13 November 2026 and asked for a colour-only change with exact hex values. It matches `CLAY_DAY` and `data-palette='day'` on branch `claude/admiring-johnson-oalgb6` (that branch also has a Night mode, not brought here).
+
+- Interface tokens in `src/styles.css` `:root`: background #E6ECEF, sheets #FFFFFF, text #0D1424, muted #4A5873, lines #D3DBE4, accent gold #8A5A00 with white on it, pin outline #6B7C99, pin number #1E2A47.
+- Scene `CLAY_DAY` in `src/themes.ts`: ground #DCE4EA, slabs #E3EAEF, roads #CBD5DF, buildings #C3D0E0, Haram teal #5EAABD, Kaabah #05070C, pilgrim dots midnight #0D1424, shadows at 0.6.
+- Gold is only for selected/active items, the primary action and the focus ring. Teal is only for the Haram. No orange, green, cyan or purple; no #000000 text.
+- Colours not yet defined by the owner: warnings, errors, success, disabled. Do not invent them; use the closest neutral and ask.
+- The older looks (`?look=cyan-light` and others) still exist for comparison but use colours outside the scheme.
+
 ## Private preview page
 
-The owner reviews on their phone through a private Claude page: https://claude.ai/artifact/TVMByBrJu5m5qKzZiPbjGL. It is built with `VITE_DEFAULT_LOOK=cyan-light npx vite build --base ./ --outDir <scratch>/preview`, and the built `index.html` is reduced to its content (title, script, stylesheet, `#root`) because the Artifact tool adds the document wrapper. It shows only cyan on beige (option A), with cast shadows at half strength (`shadowStrength: 0.5`) at the owner's request. Republish to the same URL after changes.
+The owner reviews on their phone through a private Claude page: https://claude.ai/artifact/TVMByBrJu5m5qKzZiPbjGL. It is built with `npx vite build --base ./ --outDir <scratch>/preview`, and the built `index.html` is reduced to its content (title, script, stylesheet, `#root`) because the Artifact tool adds the document wrapper. It now shows the Day scheme (the app's default). Republish to the same URL after changes.
 
 ## Scope change: Makkah and Madinah guide (owner's decisions)
 

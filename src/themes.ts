@@ -132,3 +132,23 @@ export const CLAY_CYAN_GREY: SceneTheme = { ...CLAY_CYAN_LIGHT, ...LIGHT_GREY_GR
 
 /** The first plain Clay look (white buildings, simple lighting) on the light grey ground. */
 export const CLAY_PLAIN_GREY: SceneTheme = { ...CLAY, ...LIGHT_GREY_GROUND, node: 0xe8771a }; // orange nodes to match the orange accent
+
+/**
+ * Murshid "Day": the owner's colour scheme, copied exactly from CLAY_DAY on
+ * branch claude/admiring-johnson-oalgb6. Teal is only for the Haram; the
+ * Kaabah stays near-black; pilgrim dots are midnight (gold on teal fails contrast).
+ */
+export const CLAY_DAY: SceneTheme = {
+  ...CLAY_CYAN_LIGHT,
+  background: 0xe6ecef,
+  ground: 0xdce4ea,
+  slab: 0xe3eaef,
+  road: 0xcbd5df,
+  skyGround: 0xdce4ea,
+  sky: 0xe4ecff,
+  building: 0xc3d0e0,
+  haram: 0x5eaabd,
+  kaabah: 0x05070c,
+  node: 0x0d1424,
+  shadowStrength: 0.6,
+};

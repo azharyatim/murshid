@@ -208,8 +208,9 @@ export class CityScene {
         mesh.receiveShadow = true;
         this.scene.add(mesh);
       };
-      addMerged(buildingGeometry(city, ['building'], theme.baseShade ?? 0.8), this.mats.building);
-      addMerged(buildingGeometry(city, ['haram', 'roof']), this.mats.haram);
+      // Shade canopies ('roof') take the building colour, so the Haram's colour is used for the Haram only.
+      addMerged(buildingGeometry(city, ['building', 'roof'], theme.baseShade ?? 0.8), this.mats.building);
+      addMerged(buildingGeometry(city, ['haram']), this.mats.haram);
       addMerged(matafGeometry(city), this.mats.haram);
     } else if (model) {
       this.scene.add(this.buildTerrain());

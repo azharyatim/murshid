@@ -168,6 +168,7 @@ The owner reviews on their phone through a private Claude page: https://claude.a
 - **Navigation:** the default view shows Makkah and Madinah on one map; people zoom in and out to move between them. There are no tabs or home screen for now.
 - **Far places** (Arafah, Jabal al-Nur, Uhud, Quba...) appear on a flat regional map with pins. The detailed 3D city is only around the Haram and the Prophet's Mosque. 3D around each place is a possible later feature.
 - **Order:** places come next, before stage 2 (steps and duas). The owner approves the place list first: draft in `docs/places-draft.md`.
+- **First version of places = group 1 only** (owner, 15 Nov 2026): Masjid al-Haram, Masjid al-Nabawi, Masjid Quba, Jabal Uhud, Al-Baqi', Jabal al-Nur / Cave of Hira, Badr — the places whose significance is already sourced. Needs the regional OpenStreetMap download (main roads, railway, coastline, towns and these places, bbox 21.1–24.8 N, 38.7–40.6 E) and the two Madinah downloads.
 - **Place list merged** with the owner's own list (13 Nov 2026), which added Taif (Masjid Abdullah ibn Abbas, rose farms and factory), Badr, a date farm, Jabal al-Rumah and al-Hudaybiyah. The opening map shows Makkah and Madinah only; Taif and Badr are reached by zooming or dragging. Place names show the standard English spelling with the owner's spelling in brackets, e.g. "Jabal Thawr (Jabal Tsur)".
 - The Madinah 3D core needs the same two OpenStreetMap downloads as Makkah (buildings and roads, then building parts), centred on the Prophet's Mosque.
 

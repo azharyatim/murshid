@@ -1,6 +1,6 @@
 # Places: merged list (owner's list + first draft)
 
-Status: **draft, not final.** Nothing here is in the app yet. On 13 November 2026 the owner sent their own list and asked to merge it with the first draft. Each approved place will get a researched description, its location from map data, walking distance computed from coordinates, and transport information with a "last checked" date.
+Status: **group 1 approved for the first version (15 Nov 2026):** Masjid al-Haram, Masjid al-Nabawi, Masjid Quba, Jabal Uhud, Al-Baqi', Jabal al-Nur and the Cave of Hira, Badr. Everything else stays in the list and joins as it is sourced. Previously: Nothing here is in the app yet. On 13 November 2026 the owner sent their own list and asked to merge it with the first draft. Each approved place will get a researched description, its location from map data, walking distance computed from coordinates, and transport information with a "last checked" date.
 
 - **Names:** standard English spelling first, the owner's spelling in brackets, e.g. "Jabal Thawr (Jabal Tsur)". Easy to swap if the owner prefers theirs first.
 - **Opening map:** shows Makkah and Madinah only. Taif and Badr are reached by zooming out or dragging the flat regional map.

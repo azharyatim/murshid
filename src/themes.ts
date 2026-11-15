@@ -24,6 +24,10 @@ export interface SceneTheme {
   road?: number;
   /** How dark cast shadows are, 0 (none) to 1 (full). Default 1. */
   shadowStrength?: number;
+  /** Regional map: the sea. Defaults to the background colour. */
+  sea?: number;
+  /** Regional map: the railway. Defaults to the road colour. */
+  rail?: number;
 }
 
 export const CLAY: SceneTheme = {
@@ -151,4 +155,7 @@ export const CLAY_DAY: SceneTheme = {
   kaabah: 0x05070c,
   node: 0x0d1424,
   shadowStrength: 0.6,
+  // Not in the owner's Day scheme yet; the closest neutrals from it, pending the owner's choice:
+  sea: 0xe6ecef, // page background
+  rail: 0x6b7c99, // pin outline
 };

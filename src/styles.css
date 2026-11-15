@@ -374,3 +374,155 @@ h1 {
   font-size: 15px;
   white-space: nowrap;
 }
+
+/* Places on the map (group 1). A dot on the exact point with the short name beside it.
+   The selected place fills the dot with the accent; the sheet names it too, so
+   colour is not the only sign. */
+.spot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  padding: 0 0 0 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  pointer-events: auto;
+  will-change: transform;
+}
+
+.spot-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--sheet);
+  border: 3px solid var(--pin-line);
+  box-shadow: 0 1px 4px rgba(13, 20, 36, 0.14); /* soft, cool: midnight #0d1424, not black */
+}
+
+.spot-name {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sheet) 88%, transparent);
+  color: var(--pin-ink);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.spot.is-on .spot-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.spot.is-on .spot-name {
+  font-weight: 700;
+}
+
+.spot:focus-visible {
+  outline: none;
+}
+
+.spot:focus-visible .spot-dot {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.spot.is-occluded .spot-dot,
+.spot.is-occluded .spot-name {
+  opacity: 0.6;
+}
+
+.spot.is-occluded .spot-dot {
+  border-style: dotted;
+}
+
+/* City names on the far-out map. Tapping one zooms in to that city. */
+.city-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  will-change: transform;
+}
+
+.city-label span {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 16px;
+  border-radius: 22px;
+  background: var(--sheet);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: auto;
+  box-shadow: 0 1px 4px rgba(13, 20, 36, 0.14);
+}
+
+.city-label:focus-visible {
+  outline: none;
+}
+
+.city-label:focus-visible span {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The place panel in the sheet. */
+.place-info .lede {
+  margin-bottom: 8px;
+}
+
+.place-distance {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.sources-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sources {
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+/* Links: no link colour is defined in the Day scheme yet, so they use the text colour, underlined. */
+.sources a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sources a:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}

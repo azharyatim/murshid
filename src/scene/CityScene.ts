@@ -8,7 +8,18 @@ import type { SceneTheme } from '../themes';
 import { MARWA, SAFA } from '../data/steps';
 import { generateSampleCity, type Box } from './sampleCity';
 import { generateModelCity, terrainHeight } from './modelCity';
-import { buildingGeometry, kaabahGeometry, matafClearance, matafGeometry, roadGeometry, type CityData } from './realCity';
+import {
+  buildingGeometry,
+  flatPolygon,
+  kaabahGeometry,
+  matafClearance,
+  matafGeometry,
+  polylineGeometry,
+  roadGeometry,
+  type CityData,
+  type RegionData,
+} from './realCity';
+import { regionXZ } from './projection';
 
 /**
  * 'plain' is the flat placeholder grid with simple lighting.
@@ -66,6 +77,11 @@ const NODE_COUNT = 150;
 const MATAF_RADIUS = 68;
 const MIN_DISTANCE = 160;
 const MAX_DISTANCE = 2600;
+/** With the regional map: far enough out to see Makkah and Madinah together. */
+const MAX_DISTANCE_REGION = 1_600_000;
+/** The regional map's area, in metres from its origin, that the view may be dragged across. */
+const REGION_BOUNDS = { minX: -120_000, maxX: 100_000, minZ: -210_000, maxZ: 215_000 };
+
 const MIN_POLAR = 0.02; // straight down
 const MAX_POLAR = 1.3; // close to the horizon
 const AERIAL_POLAR = 0.4;
@@ -84,8 +100,12 @@ interface TawafNode {
 /** An HTML element pinned to a point in the 3D scene. */
 export interface Pin {
   el: HTMLElement;
-  /** Metres from the Kaabah: x = east, z = south. */
+  /** Metres in scene space: x = east, z = south. From the Kaabah, or from the regional origin with the regional map. */
   pos: [number, number];
+  /** Shown only while the camera is at least this far from the point it looks at (metres). */
+  minDist?: number;
+  /** Shown only while the camera is at most this far away (metres). */
+  maxDist?: number;
   /** Height in metres the pin points at: just above whatever stands there. Set by setPins. */
   y?: number;
 }
@@ -121,12 +141,19 @@ export class CityScene {
     kaabah: new THREE.MeshStandardMaterial({ roughness: 0.85 }),
     node: new THREE.MeshBasicMaterial(),
     road: new THREE.MeshStandardMaterial({ roughness: 1, side: THREE.DoubleSide }),
+    sea: new THREE.MeshStandardMaterial({ roughness: 1 }),
+    regionRoad: new THREE.LineBasicMaterial(),
+    rail: new THREE.LineDashedMaterial({ dashSize: 1, gapSize: 1 }),
   };
+  /** Everything belonging to Makkah's 3D city. Placed at Makkah's position on the regional map. */
+  private makkah = new THREE.Group();
+  private region: RegionData | null = null;
+  private sunOffset = new THREE.Vector3(-520, 720, 380);
   private nodes: TawafNode[] = [];
   private nodeMesh: THREE.InstancedMesh;
   private dummy = new THREE.Object3D();
   private pins: Pin[] = [];
-  private overview: { center: THREE.Vector3; radius: number };
+  private overview: { center: THREE.Vector3; radius: number; box: THREE.Box3 };
   private flight: Flight | null = null;
   private raf = 0;
   private last = 0;
@@ -150,6 +177,11 @@ export class CityScene {
     private look: Look = 'plain',
     /** Real OpenStreetMap city. When given, it replaces the illustrative city and Haram. */
     city: CityData | null = null,
+    /**
+     * The regional map, with Madinah's 3D city. When given, the scene covers both
+     * cities: positions (pins, overview points) are then in regional metres.
+     */
+    regional: { region: RegionData; madinah: CityData | null } | null = null,
   ) {
     this.reducedMotion = reducedMotion;
     const model = look !== 'plain';
@@ -173,8 +205,9 @@ export class CityScene {
     }
 
     // Lighting: one soft sun plus sky fill gives the clay-model look.
-    this.sun.position.set(-520, 720, 380);
+    this.sun.position.copy(this.sunOffset);
     this.sun.castShadow = true;
+    this.scene.add(this.sun.target);
     const size = model ? (small ? 2048 : 4096) : small ? 1024 : 2048;
     this.sun.shadow.mapSize.set(size, size);
     const sc = this.sun.shadow.camera;
@@ -189,29 +222,29 @@ export class CityScene {
     this.sun.shadow.normalBias = 1.2;
     this.scene.add(this.sun, this.sky);
 
+    this.scene.add(this.makkah);
     // Ground (roads and open space).
     if (city) {
-      // Real map data sits on flat ground: there is no real terrain yet.
-      const ground = new THREE.Mesh(new THREE.CircleGeometry(4000, 64), this.mats.ground);
-      ground.rotation.x = -Math.PI / 2;
-      ground.receiveShadow = true;
-      this.scene.add(ground);
-      const roads = new THREE.Mesh(roadGeometry(city), this.mats.road);
-      roads.receiveShadow = true;
-      this.scene.add(roads);
       this.mats.building.vertexColors = true;
       if (look === 'cyan') addWindows(this.mats.building);
-      const addMerged = (geo: THREE.BufferGeometry | null, mat: THREE.Material) => {
-        if (!geo) return;
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        this.scene.add(mesh);
-      };
-      // Shade canopies ('roof') take the building colour, so the Haram's colour is used for the Haram only.
-      addMerged(buildingGeometry(city, ['building', 'roof'], theme.baseShade ?? 0.8), this.mats.building);
-      addMerged(buildingGeometry(city, ['haram']), this.mats.haram);
-      addMerged(matafGeometry(city), this.mats.haram);
+      if (regional) {
+        this.region = regional.region;
+        this.buildRegion(regional.region);
+        this.makkah.position.set(...this.cityOffset(city));
+      } else {
+        // Real map data sits on flat ground: there is no real terrain yet.
+        const ground = new THREE.Mesh(new THREE.CircleGeometry(4000, 64), this.mats.ground);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        this.makkah.add(ground);
+      }
+      this.buildCity(city, this.makkah, theme);
+      if (regional?.madinah) {
+        const madinah = new THREE.Group();
+        madinah.position.set(...this.cityOffset(regional.madinah));
+        this.buildCity(regional.madinah, madinah, theme);
+        this.scene.add(madinah);
+      }
     } else if (model) {
       this.scene.add(this.buildTerrain());
       this.mats.building.vertexColors = true;
@@ -230,15 +263,16 @@ export class CityScene {
 
     // The Kaabah: simple massing, the only dark object in the scene. With real
     // data it is the OpenStreetMap footprint; otherwise a placeholder cube.
-    const kaabah = city
-      ? new THREE.Mesh(kaabahGeometry(city), this.mats.kaabah)
+    const kaabahGeo = city ? kaabahGeometry(city) : null;
+    const kaabah = kaabahGeo
+      ? new THREE.Mesh(kaabahGeo, this.mats.kaabah)
       : new THREE.Mesh(new THREE.BoxGeometry(11, 13, 12.5), this.mats.kaabah);
     if (!city) {
       kaabah.position.y = 6.5;
       kaabah.rotation.y = 0.5;
     }
     kaabah.castShadow = true;
-    this.scene.add(kaabah);
+    this.makkah.add(kaabah);
 
     // Travelling nodes circling the Kaabah anticlockwise.
     this.nodeMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1.7, 10, 8), this.mats.node, NODE_COUNT);
@@ -255,14 +289,16 @@ export class CityScene {
       this.nodes.push({ radius, angle: rnd() * Math.PI * 2, speed: (5.5 + rnd() * 2) / radius });
     }
     this.placeNodes();
-    this.scene.add(this.nodeMesh);
-    this.occluders = this.scene.children.filter((o) => o instanceof THREE.Mesh && o.castShadow && o !== this.nodeMesh);
+    this.makkah.add(this.nodeMesh);
+    this.scene.traverse((o) => {
+      if (o instanceof THREE.Mesh && o.castShadow && o !== this.nodeMesh) this.occluders.push(o);
+    });
 
     // Frame for the default aerial view.
     const box = new THREE.Box3();
     overviewPoints.forEach(([x, z]) => box.expandByPoint(new THREE.Vector3(x, 0, z)));
     const sphere = box.getBoundingSphere(new THREE.Sphere());
-    this.overview = { center: sphere.center, radius: sphere.radius };
+    this.overview = { center: sphere.center, radius: sphere.radius, box };
 
     // Map-style gestures, at the owner's request: one finger drags the map; two
     // fingers pinch to zoom, drag sideways to rotate and drag up or down to tilt.
@@ -270,7 +306,9 @@ export class CityScene {
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.minDistance = MIN_DISTANCE;
-    this.controls.maxDistance = MAX_DISTANCE;
+    this.controls.maxDistance = this.region ? MAX_DISTANCE_REGION : MAX_DISTANCE;
+    // Zooming spans metres to hundreds of kilometres with the regional map, so each pinch goes further.
+    if (this.region) this.controls.zoomSpeed = 1.6;
     this.controls.minPolarAngle = MIN_POLAR;
     this.controls.maxPolarAngle = MAX_POLAR;
     this.controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
@@ -278,12 +316,17 @@ export class CityScene {
     // Drag across the ground, not across the screen, so tilted views slide like a map.
     this.controls.screenSpacePanning = false;
     this.controls.addEventListener('change', () => {
-      // Keep the view from being dragged away from the Haram area.
+      // Keep the view from being dragged away from the mapped area.
       const t = this.controls.target;
-      const d = Math.hypot(t.x, t.z);
-      if (d > 700) {
-        t.x *= 700 / d;
-        t.z *= 700 / d;
+      if (this.region) {
+        t.x = THREE.MathUtils.clamp(t.x, REGION_BOUNDS.minX, REGION_BOUNDS.maxX);
+        t.z = THREE.MathUtils.clamp(t.z, REGION_BOUNDS.minZ, REGION_BOUNDS.maxZ);
+      } else {
+        const d = Math.hypot(t.x, t.z);
+        if (d > 700) {
+          t.x *= 700 / d;
+          t.z *= 700 / d;
+        }
       }
       t.y = 0;
       this.needsRender = true;
@@ -296,6 +339,49 @@ export class CityScene {
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas.parentElement ?? canvas);
     this.raf = requestAnimationFrame(this.tick);
+  }
+
+  /** Where a city's local origin sits on the regional map. */
+  private cityOffset(c: CityData): [number, number, number] {
+    const [x, z] = regionXZ(c.origin.lat, c.origin.lon);
+    return [x, 0, z];
+  }
+
+  /** One real city: roads, buildings, the mosque and (Makkah only) the mataf floor. */
+  private buildCity(c: CityData, root: THREE.Object3D, theme: SceneTheme) {
+    const roads = new THREE.Mesh(roadGeometry(c), this.mats.road);
+    roads.receiveShadow = true;
+    root.add(roads);
+    const addMerged = (geo: THREE.BufferGeometry | null, mat: THREE.Material) => {
+      if (!geo) return;
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      root.add(mesh);
+    };
+    // Shade canopies ('roof') take the building colour, so the Haram's colour is used for the mosque only.
+    addMerged(buildingGeometry(c, ['building', 'roof'], theme.baseShade ?? 0.8), this.mats.building);
+    addMerged(buildingGeometry(c, ['haram']), this.mats.haram);
+    addMerged(matafGeometry(c), this.mats.haram);
+  }
+
+  /** The regional map: flat ground, the sea, main roads and the railway. */
+  private buildRegion(r: RegionData) {
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(2_000_000, 2_000_000), this.mats.ground);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+    if (r.sea) {
+      const sea = new THREE.Mesh(flatPolygon(r.sea, 0.05), this.mats.sea);
+      sea.receiveShadow = true;
+      this.scene.add(sea);
+      r.islands.forEach((ring) => this.scene.add(new THREE.Mesh(flatPolygon(ring, 0.08), this.mats.ground)));
+    }
+    // Main roads and the railway as thin lines, so they stay visible from far away.
+    this.scene.add(new THREE.LineSegments(polylineGeometry(r.roads.map((x) => x.pts), 0.5), this.mats.regionRoad));
+    const rail = new THREE.LineSegments(polylineGeometry(r.rail, 0.6), this.mats.rail);
+    rail.computeLineDistances();
+    this.scene.add(rail);
   }
 
   /** Hills in stacked contour layers, like a cut-card site model. Illustrative only. */
@@ -413,6 +499,9 @@ export class CityScene {
     this.scene.fog = new THREE.Fog(t.background, 1900, 4200);
     this.mats.ground.color.set(t.ground);
     this.mats.road.color.set(t.road ?? t.slab);
+    this.mats.sea.color.set(t.sea ?? t.background);
+    this.mats.regionRoad.color.set(t.road ?? t.slab);
+    this.mats.rail.color.set(t.rail ?? t.road ?? t.slab);
     this.mats.slab.color.set(t.slab);
     this.mats.building.color.set(t.building);
     if (t.buildingEmissive !== undefined) this.mats.building.emissive.set(t.buildingEmissive);
@@ -451,7 +540,7 @@ export class CityScene {
   // Camera moves ------------------------------------------------------------
 
   private flyTo(target: THREE.Vector3, distance: number, polar: number, azimuth: number, animate = true) {
-    const d = THREE.MathUtils.clamp(distance, MIN_DISTANCE, MAX_DISTANCE);
+    const d = THREE.MathUtils.clamp(distance, MIN_DISTANCE, this.controls.maxDistance);
     const p = THREE.MathUtils.clamp(polar, MIN_POLAR, MAX_POLAR);
     const toPos = new THREE.Vector3(
       target.x + d * Math.sin(p) * Math.sin(azimuth),
@@ -483,7 +572,12 @@ export class CityScene {
   showAll(animate = true) {
     const vHalf = THREE.MathUtils.degToRad(this.camera.fov / 2);
     const hHalf = Math.atan(Math.tan(vHalf) * this.camera.aspect);
-    const dist = (this.overview.radius * 1.22) / Math.sin(Math.min(vHalf, hHalf));
+    let dist = (this.overview.radius * 1.22) / Math.sin(Math.min(vHalf, hHalf));
+    if (this.region) {
+      // Fit the long, narrow north-south box of the two cities by height and width separately.
+      const size = this.overview.box.getSize(new THREE.Vector3());
+      dist = Math.max(size.z / 2 / Math.tan(vHalf), size.x / 2 / Math.tan(hHalf)) * 1.3;
+    }
     this.flyTo(this.overview.center.clone(), dist, AERIAL_POLAR, 0, animate);
   }
 
@@ -494,8 +588,13 @@ export class CityScene {
   }
 
   /** Move in on one point, keeping the current compass direction. */
-  focus(pos: [number, number]) {
-    this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), 720, 0.75, this.tiltAzimuth());
+  focus(pos: [number, number], distance = 720) {
+    this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), distance, 0.75, this.tiltAzimuth());
+  }
+
+  /** Move to a point from straight above, at a given distance (used for whole cities). */
+  lookDownAt(pos: [number, number], distance: number) {
+    this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), distance, AERIAL_POLAR, 0);
   }
 
   zoomBy(factor: number) {
@@ -534,9 +633,11 @@ export class CityScene {
   private updatePins() {
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
+    const d = this.distance();
     for (const pin of this.pins) {
+      const inRange = d >= (pin.minDist ?? 0) && d <= (pin.maxDist ?? Infinity);
       this.tmp.set(pin.pos[0], pin.y ?? 26, pin.pos[1]).project(this.camera);
-      const visible = this.tmp.z < 1 && Math.abs(this.tmp.x) < 1.2 && Math.abs(this.tmp.y) < 1.2;
+      const visible = inRange && this.tmp.z < 1 && Math.abs(this.tmp.x) < 1.2 && Math.abs(this.tmp.y) < 1.2;
       pin.el.style.visibility = visible ? 'visible' : 'hidden';
       if (!visible) continue;
       const x = (this.tmp.x * 0.5 + 0.5) * w;
@@ -578,6 +679,7 @@ export class CityScene {
       this.needsRender = true;
     }
     this.controls.update();
+    if (this.region) this.fitToDistance();
     this.camera.updateMatrixWorld();
     if (!this.lastCamera.equals(this.camera.matrixWorld)) {
       this.lastCamera.copy(this.camera.matrixWorld);
@@ -596,12 +698,37 @@ export class CityScene {
     }
   };
 
+  /**
+   * With the regional map the view ranges from a few hundred metres to hundreds of
+   * kilometres, so clipping, fog, the sun's shadow area (a few km around the point
+   * looked at) and railway dashes follow the current distance.
+   */
+  private fitToDistance() {
+    const d = this.distance();
+    const near = THREE.MathUtils.clamp(d * 0.01, 1, 20_000);
+    const far = d * 12 + 6000;
+    if (Math.abs(near - this.camera.near) > near * 0.05 || Math.abs(far - this.camera.far) > far * 0.05) {
+      this.camera.near = near;
+      this.camera.far = far;
+      this.camera.updateProjectionMatrix();
+    }
+    if (this.scene.fog instanceof THREE.Fog) {
+      this.scene.fog.near = d * 2.6;
+      this.scene.fog.far = d * 7;
+    }
+    const t = this.controls.target;
+    this.sun.position.copy(t).add(this.sunOffset);
+    this.sun.target.position.copy(t);
+    // Dashes about 0.6% of the viewing distance long, so the railway reads as dashed at every zoom.
+    this.mats.rail.scale = 1 / (d * 0.006);
+  }
+
   dispose() {
     cancelAnimationFrame(this.raf);
     this.resizeObserver.disconnect();
     this.controls.dispose();
     this.scene.traverse((o) => {
-      if (o instanceof THREE.Mesh) o.geometry.dispose();
+      if (o instanceof THREE.Mesh || o instanceof THREE.Line) o.geometry.dispose();
     });
     Object.values(this.mats).forEach((m) => m.dispose());
     this.composer?.dispose();

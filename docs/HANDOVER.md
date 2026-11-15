@@ -143,6 +143,18 @@ The owner downloaded the OpenStreetMap export by hand through Overpass Turbo; th
 - Safa and Marwa pins now come from the ends of the Mas'a walkway in OSM. The other pins are still placeholders.
 - The accent colour to replace the green is still the owner's decision.
 
+## Places, first version (group 1) and the regional map
+
+Built 15 November 2026 from three OpenStreetMap downloads the owner made (raw files in `data/raw/`, gitignored): `region.json`, `madinah-nabawi.json`, `madinah-nabawi-parts.json` (empty: no building parts are mapped around the Prophet's Mosque).
+
+- `scripts/bake-region.mjs` makes `public/data/region.json`: main roads, the Haramain railway, the sea (built from the coastline), cities, towns and named features, in metres from a regional origin (`scripts/region-projection.mjs`, mirrored in `src/scene/projection.ts`). Run `node scripts/bake-region.mjs`.
+- `scripts/bake-osm.mjs` now takes `makkah-haram` or `madinah-nabawi` (per-city settings in `CITIES`). Madinah: 338 buildings, 317 with estimated heights; the mosque, its Eastern Expansion and the 10 minarets within 300 m are drawn as the mosque.
+- `src/data/places.ts`: the group 1 places with OSM positions and tool-fetched sources. Al-Baqi' is approved but not shown: its outline was not in the downloads.
+- The scene places each city's 3D model at its real position on the regional map. Pins appear by zoom: far out only the city names (Makkah, Madinah) and Badr; within 60 km the places; within 8 km the Umrah step pins and the Safa/Marwa labels.
+- Distances are straight-line (haversine) from the nearer of the two mosques. Walking routes are not built.
+- Colours not in the Day scheme, set to the closest listed neutral pending the owner: sea #E6ECEF (page background), railway #6B7C99 (pin outline), links #0D1424 underlined (text colour).
+- Not done yet: descriptions, walking routes, terrain, Al-Baqi', town names other than Makkah and Madinah.
+
 ## Accent and grey-ground looks
 
 - The interface accent is now orange `#b8520b` (owner's choice). It is deeper than the map's `#e8771a` nodes so white text on it reaches 4.9:1; the node orange would give only 3:1.

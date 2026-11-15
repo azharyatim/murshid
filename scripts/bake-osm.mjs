@@ -1,9 +1,9 @@
 // Converts a raw Overpass export (data/raw/<name>.json) into the compact city
 // file the app loads (public/data/<name>.json). Run at build time only.
-// Usage: node scripts/bake-osm.mjs makkah-haram
+// Usage: node scripts/bake-osm.mjs makkah-haram | madinah-nabawi
 //
-// Coordinates become metres from the centre of the Kaabah's OpenStreetMap
-// footprint: x = east, z = south. Heights come from the `height` tag, then
+// Coordinates become metres from the city's origin (the centre of the Kaabah's
+// footprint in Makkah, of the Prophet's Mosque in Madinah): x = east, z = south. Heights come from the `height` tag, then
 // `building:levels`, and otherwise are ESTIMATED; estimated buildings carry
 // `est: 1` so the app can say so.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -16,16 +16,37 @@ if (!name) {
 const raw = JSON.parse(readFileSync(`data/raw/${name}.json`, 'utf8'));
 const els = raw.elements;
 
-const KAABAH_WAY = 103914569; // OSM way for the Kaabah
-const HARAM_RELATION = 1472531; // OSM multipolygon for Masjid al-Haram
+// Per city: the OSM feature whose centre is the origin, and the OSM features
+// drawn as the mosque (in the Haram colour).
+const CITIES = {
+  'makkah-haram': {
+    origin: { type: 'way', id: 103914569, note: 'centre of the Kaabah footprint' }, // the Kaabah
+    kaabah: true,
+    mosque: [{ type: 'relation', id: 1472531 }], // Masjid al-Haram
+  },
+  'madinah-nabawi': {
+    origin: { type: 'way', id: 461699097, note: "centre of the Prophet's Mosque footprint" },
+    kaabah: false,
+    // The Prophet's Mosque and its Eastern Expansion.
+    mosque: [
+      { type: 'way', id: 461699097 },
+      { type: 'way', id: 486835591 },
+    ],
+  },
+};
+const city = CITIES[name];
+if (!city) throw new Error(`unknown city ${name}; add it to CITIES`);
+const isMosque = (e) => city.mosque.some((m) => m.type === e.type && m.id === e.id);
+const KAABAH_WAY = city.kaabah ? city.origin.id : null;
 const MASA_NAME = "Sa'i / Al Masa'a Safa - Marwa";
 const MAQAM_NAME = 'Maqam Ibrahim';
 // Wikidata ids of features inside the mataf: Maqam Ibrahim, Hijr Isma'il.
 const HARAM_FEATURES = ['Q3696312', 'Q2080761'];
 
-const kaabah = els.find((e) => e.type === 'way' && e.id === KAABAH_WAY);
-if (!kaabah) throw new Error('Kaabah footprint not found in the export');
-const kRing = kaabah.geometry.slice(0, -1);
+const originEl = els.find((e) => e.type === city.origin.type && e.id === city.origin.id);
+if (!originEl) throw new Error('origin feature not found in the export');
+const kaabah = city.kaabah ? originEl : null;
+const kRing = originEl.geometry.slice(0, -1);
 const lat0 = kRing.reduce((s, p) => s + p.lat, 0) / kRing.length;
 const lon0 = kRing.reduce((s, p) => s + p.lon, 0) / kRing.length;
 const mPerLon = Math.cos((lat0 * Math.PI) / 180) * 111320;
@@ -116,7 +137,7 @@ const centre = (ring) => ({
 // 1. Building outlines.
 const footprints = [];
 // The Kaabah is drawn separately; listed here only so parts inside it are ignored.
-footprints.push({ simple: true, hidden: true, outer: kaabah.geometry, holes: [] });
+if (kaabah) footprints.push({ simple: true, hidden: true, outer: kaabah.geometry, holes: [] });
 for (const e of els) {
   const t = e.tags ?? {};
   if (!t.building || e.id === KAABAH_WAY) continue;
@@ -128,7 +149,12 @@ for (const e of els) {
   const { outer, inner } = ringsOf(e);
   // Maqam Ibrahim and the Hijr Isma'il wall are drawn as part of the mosque, not as city buildings.
   const special = HARAM_FEATURES.includes(t.wikidata);
-  const kind = e.id === HARAM_RELATION || special ? 'haram' : t.building === 'roof' ? 'roof' : 'building';
+  // Minarets mapped as separate towers (as around the Prophet's Mosque) belong to the
+  // mosque when they stand within 300 m of the city's origin.
+  const c0 = outer[0] && centre(outer[0].slice(0, -1));
+  const nearOrigin = c0 && Math.hypot(...toXZ(c0)) < 300;
+  const minaret = t['tower:type'] === 'minaret' && nearOrigin;
+  const kind = isMosque(e) || special || minaret ? 'haram' : t.building === 'roof' ? 'roof' : 'building';
   for (const o of outer) {
     // `simple`: kept as plain massing even if detailed parts exist inside it.
     footprints.push({ kind, h, est, min: minHeightOf(t), outer: o, holes: inner.filter((r) => inside(r[0], o)), simple: special });
@@ -202,9 +228,9 @@ const centroid = (g) => {
   const pts = g.slice(0, -1).map(toXZ);
   return [r1(pts.reduce((s, p) => s + p[0], 0) / pts.length), r1(pts.reduce((s, p) => s + p[1], 0) / pts.length)];
 };
-const landmarks = { kaabah: flat(kaabah.geometry), kaabahHeight: num(kaabah.tags.height) ?? 15 };
+const landmarks = kaabah ? { kaabah: flat(kaabah.geometry), kaabahHeight: num(kaabah.tags.height) ?? 15 } : {};
 // The open courtyard around the Kaabah (the mataf): the hole in the mosque outline.
-const haramRel = els.find((e) => e.type === 'relation' && e.id === HARAM_RELATION);
+const haramRel = kaabah && els.find((e) => e.type === 'relation' && isMosque(e));
 const matafRing = haramRel && assemble(haramRel.members.filter((m) => m.role === 'inner' && m.geometry).map((m) => m.geometry))[0];
 if (matafRing) landmarks.mataf = flat(matafRing);
 if (maqam) landmarks.maqam = centroid(maqam.geometry);
@@ -217,7 +243,7 @@ if (masa) {
 const out = {
   source: 'OpenStreetMap contributors, ODbL',
   osmTimestamp: raw.osm3s?.timestamp_osm_base,
-  origin: { lat: lat0, lon: lon0, note: 'centre of the Kaabah footprint' },
+  origin: { lat: lat0, lon: lon0, note: city.origin.note },
   landmarks,
   buildings,
   roads,

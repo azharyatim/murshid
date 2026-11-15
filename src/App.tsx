@@ -12,17 +12,42 @@ import {
   CLAY_PLAIN_GREY,
 } from './themes';
 import { MARWA, SAFA, STEPS } from './data/steps';
-import { loadCity, type CityData } from './scene/realCity';
+import { MOSQUES, PLACES as SITES, type Place } from './data/places';
+import { loadCity, loadRegion, type CityData, type RegionData } from './scene/realCity';
+import { distanceMetres, regionXZ } from './scene/projection';
 
 // The overview screen: an aerial map of the Haram with a numbered pin for
 // each Umrah step, and a sheet that names the selected step.
 
 const MAP_STEPS = STEPS.filter((s) => s.pos !== null);
 const MIQAT_STEPS = STEPS.filter((s) => s.pos === null);
+// Labels inside the Haram (positions in metres from the Kaabah).
 const PLACES: { name: string; pos: [number, number] }[] = [
   { name: 'Safa', pos: SAFA },
   { name: 'Marwa', pos: MARWA },
 ];
+
+// With the regional map, which pins show depends on how far out the view is (metres).
+const CITY_VIEW = 60_000; // further out than this: only city names (and Badr)
+const STREET_VIEW = 8_000; // closer than this: the Umrah step pins and Haram labels
+const CITY_LABELS = [
+  { name: 'Makkah', placeId: 'haram' },
+  { name: 'Madinah', placeId: 'nabawi' },
+];
+
+/** How far to stand back when a place is chosen (metres). */
+function focusDistance(p: Place) {
+  if (p.id === 'badr') return 6000;
+  return p.id === 'haram' || p.id === 'nabawi' ? 1500 : 2500;
+}
+
+/** Straight-line distance from the nearer of the two mosques, in plain words. */
+function distanceText(p: Place) {
+  if (MOSQUES.some((m) => m.id === p.id)) return null;
+  const [m, d] = MOSQUES.map((m) => [m, distanceMetres(m, p)] as const).sort((a, b) => a[1] - b[1])[0];
+  const amount = d < 1000 ? `${Math.round(d / 50) * 50} m` : d < 20_000 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d / 1000)} km`;
+  return `About ${amount} from ${m.short}, in a straight line. Walking and travel routes come later.`;
+}
 
 // The plain look stays the default until the model look is approved.
 // Add ?look=model or ?look=cyan to the address to see the mockups.
@@ -52,6 +77,7 @@ const REAL_CITY = ['cyan-light', 'green', 'cyan-grey', 'clay-grey', 'day'].inclu
 
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);
+  const [placeId, setPlaceId] = useState<string | null>(null);
   const [tilted, setTilted] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<CityScene | null>(null);
@@ -59,21 +85,50 @@ export function App() {
 
   const [city, setCity] = useState<CityData | null>(null);
   const [cityError, setCityError] = useState(false);
+  // The regional map and Madinah. If they fail to load, the app falls back to Makkah alone.
+  const [regional, setRegional] = useState<{ region: RegionData; madinah: CityData | null } | null>(null);
+  const [regionTried, setRegionTried] = useState(false);
 
   useEffect(() => {
     if (!REAL_CITY) return;
     loadCity('makkah-haram').then(setCity, () => setCityError(true));
+    Promise.all([loadRegion(), loadCity('madinah-nabawi').catch(() => null)])
+      .then(([region, madinah]) => setRegional({ region, madinah }))
+      .catch(() => setRegional(null))
+      .finally(() => setRegionTried(true));
   }, []);
+
+  // Scene positions: metres from the Kaabah, or regional metres when the regional map is shown.
+  const makkahOffset: [number, number] = regional && city ? regionXZ(city.origin.lat, city.origin.lon) : [0, 0];
+  const toScene = (p: [number, number]): [number, number] => [p[0] + makkahOffset[0], p[1] + makkahOffset[1]];
+  const sitePos = (p: Place) => regionXZ(p.lat, p.lon);
+  const showRegion = Boolean(regional && city);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || (REAL_CITY && !city && !cityError)) return;
+    if (!canvas || (REAL_CITY && ((!city && !cityError) || !regionTried))) return;
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const points = [...MAP_STEPS.map((s) => s.pos!), ...PLACES.map((p) => p.pos)];
-    const scene = new CityScene(canvas, SCENE_THEME, mq.matches, points, LOOK, city);
+    const regionNow = regional && city ? regional : null;
+    const points = regionNow
+      ? MOSQUES.map(sitePos)
+      : [...MAP_STEPS.map((s) => s.pos!), ...PLACES.map((p) => p.pos)];
+    const scene = new CityScene(canvas, SCENE_THEME, mq.matches, points, LOOK, city, regionNow);
     const pins: Pin[] = [];
-    MAP_STEPS.forEach((s) => pins.push({ el: pinEls.current.get(`step-${s.n}`)!, pos: s.pos! }));
-    PLACES.forEach((p) => pins.push({ el: pinEls.current.get(`place-${p.name}`)!, pos: p.pos }));
+    const street = regionNow ? { maxDist: STREET_VIEW } : {};
+    MAP_STEPS.forEach((s) => pins.push({ el: pinEls.current.get(`step-${s.n}`)!, pos: toScene(s.pos!), ...street }));
+    PLACES.forEach((p) => pins.push({ el: pinEls.current.get(`place-${p.name}`)!, pos: toScene(p.pos), ...street }));
+    if (regionNow) {
+      SITES.forEach((p) => {
+        // Badr stays visible from far out; the others appear once a city fills the view.
+        // The Haram's own pin gives way to the step pins up close.
+        const range = p.id === 'badr' ? {} : { maxDist: CITY_VIEW, ...(p.id === 'haram' ? { minDist: STREET_VIEW } : {}) };
+        pins.push({ el: pinEls.current.get(`site-${p.id}`)!, pos: sitePos(p), ...range });
+      });
+      CITY_LABELS.forEach((c) => {
+        const p = SITES.find((s) => s.id === c.placeId)!;
+        pins.push({ el: pinEls.current.get(`city-${c.name}`)!, pos: sitePos(p), minDist: CITY_VIEW });
+      });
+    }
     scene.setPins(pins);
     sceneRef.current = scene;
     const onChange = () => scene.setReducedMotion(mq.matches);
@@ -83,14 +138,29 @@ export function App() {
       scene.dispose();
       sceneRef.current = null;
     };
-  }, [city, cityError]);
+  }, [city, cityError, regional, regionTried]);
 
   const choose = (n: number | null) => {
     setSelected(n);
+    setPlaceId(null);
     const step = STEPS.find((s) => s.n === n);
-    if (step?.pos) sceneRef.current?.focus(step.pos);
+    if (step?.pos) sceneRef.current?.focus(toScene(step.pos));
     else sceneRef.current?.showAll();
     setTilted(Boolean(step?.pos));
+  };
+
+  const choosePlace = (p: Place) => {
+    setSelected(null);
+    setPlaceId(p.id);
+    sceneRef.current?.focus(sitePos(p), focusDistance(p));
+    setTilted(true);
+  };
+
+  /** Tapping a city name zooms to the whole city, looking straight down. */
+  const openCity = (placeId: string) => {
+    const p = SITES.find((s) => s.id === placeId)!;
+    sceneRef.current?.lookDownAt(sitePos(p), 25_000);
+    setTilted(false);
   };
 
   const setPinEl = (key: string) => (el: HTMLElement | null) => {
@@ -98,6 +168,8 @@ export function App() {
   };
 
   const step = STEPS.find((s) => s.n === selected) ?? null;
+  const place = SITES.find((p) => p.id === placeId) ?? null;
+  const distance = place ? distanceText(place) : null;
 
   return (
     <div className="app" data-look={LOOK}>
@@ -110,6 +182,35 @@ export function App() {
               <span>{p.name}</span>
             </span>
           ))}
+          {showRegion &&
+            CITY_LABELS.map((c) => (
+              <button
+                key={c.name}
+                ref={setPinEl(`city-${c.name}`)}
+                type="button"
+                className="city-label"
+                onClick={() => openCity(c.placeId)}
+              >
+                <span>{c.name}</span>
+              </button>
+            ))}
+          {showRegion &&
+            SITES.map((p) => (
+              <button
+                key={p.id}
+                ref={setPinEl(`site-${p.id}`)}
+                type="button"
+                className={`spot${placeId === p.id ? ' is-on' : ''}`}
+                aria-label={p.name}
+                aria-pressed={placeId === p.id}
+                onClick={() => choosePlace(p)}
+              >
+                <span className="spot-dot" aria-hidden="true" />
+                <span className="spot-name" aria-hidden="true">
+                  {p.short}
+                </span>
+              </button>
+            ))}
           {MAP_STEPS.map((s) => (
             <button
               key={s.n}
@@ -172,18 +273,39 @@ export function App() {
         <div className="sheet-inner">
           <div className="sheet-head">
             <div>
-              <p className="step-count">{step ? `Step ${step.n} of ${STEPS.length}` : 'Umrah in seven steps'}</p>
-              <h1>{step ? step.title : 'Where each step happens'}</h1>
+              <p className="step-count">
+                {place ? `Places · ${place.city}` : step ? `Step ${step.n} of ${STEPS.length}` : 'Umrah in seven steps'}
+              </p>
+              <h1>{place ? place.name : step ? step.title : 'Where each step happens'}</h1>
             </div>
-            {step && (
+            {(step || place) && (
               <button type="button" className="btn ghost" onClick={() => choose(null)}>
                 Show all
               </button>
             )}
           </div>
-          <p className="lede">
-            {step ? step.summary : 'Tap a number on the map or below to see where a step takes place.'}
-          </p>
+          {place ? (
+            <div className="place-info">
+              <p className="lede">
+                {place.pinNote ? `${place.pinNote} ` : ''}The description will be written from the sources below.
+              </p>
+              {distance && <p className="place-distance">{distance}</p>}
+              <h2 className="sources-title">Sources</h2>
+              <ul className="sources">
+                {place.sources.map((src) => (
+                  <li key={src.url}>
+                    <a href={src.url} target="_blank" rel="noreferrer">
+                      {src.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="lede">
+              {step ? step.summary : 'Tap a number on the map or below to see where a step takes place.'}
+            </p>
+          )}
           <ol className="stepper" aria-label="Steps">
             {STEPS.map((s) => (
               <li key={s.n}>

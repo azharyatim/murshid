@@ -8,9 +8,12 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 export interface CityData {
   source: string;
   osmTimestamp?: string;
+  /** Latitude and longitude of the city's local origin (metres are measured from here). */
+  origin: { lat: number; lon: number };
   landmarks: {
-    kaabah: number[];
-    kaabahHeight: number;
+    /** Only in Makkah. */
+    kaabah?: number[];
+    kaabahHeight?: number;
     mataf?: number[];
     maqam?: [number, number];
     safa?: [number, number];
@@ -80,7 +83,55 @@ export function matafClearance(data: CityData) {
 }
 
 export function kaabahGeometry(data: CityData) {
-  return extrude([data.landmarks.kaabah], data.landmarks.kaabahHeight);
+  return data.landmarks.kaabah ? extrude([data.landmarks.kaabah], data.landmarks.kaabahHeight ?? 15) : null;
+}
+
+/** The regional map (public/data/region.json, made by scripts/bake-region.mjs). */
+export interface RegionPoint {
+  osm: string;
+  name?: string;
+  nameEn?: string;
+  lat: number;
+  lon: number;
+  pos: [number, number];
+}
+export interface RegionData {
+  source: string;
+  osmTimestamp?: string;
+  roads: { c: 'major' | 'minor'; pts: number[] }[];
+  rail: number[][];
+  sea: number[] | null;
+  islands: number[][];
+  cities: RegionPoint[];
+  towns: RegionPoint[];
+  features: RegionPoint[];
+}
+
+export async function loadRegion(): Promise<RegionData> {
+  const res = await fetch(`${import.meta.env.BASE_URL}data/region.json`);
+  if (!res.ok) throw new Error(`could not load region data: ${res.status}`);
+  return res.json();
+}
+
+/** Polylines as one set of line segments, lying at height y. */
+export function polylineGeometry(lines: number[][], y: number) {
+  const pos: number[] = [];
+  for (const pts of lines) {
+    for (let i = 0; i + 3 < pts.length; i += 2) pos.push(pts[i], y, pts[i + 1], pts[i + 2], y, pts[i + 3]);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  return geo;
+}
+
+/** A flat polygon (the sea, or an island) lying at height y. */
+export function flatPolygon(ring: number[], y: number) {
+  const pts: THREE.Vector2[] = [];
+  for (let i = 0; i < ring.length; i += 2) pts.push(new THREE.Vector2(ring[i], -ring[i + 1]));
+  const geo = new THREE.ShapeGeometry(new THREE.Shape(pts));
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(0, y, 0);
+  return geo;
 }
 
 /** Roads as flat ribbons lying just above the ground. */

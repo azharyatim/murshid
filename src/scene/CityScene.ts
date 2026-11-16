@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { SceneTheme } from '../themes';
 import { MARWA, SAFA } from '../data/steps';
@@ -26,7 +27,7 @@ import { regionXZ } from './projection';
  * 'model' adds hills, an irregular city, warm light with cool shadows and
  * ambient occlusion, to read like a physical clay site model.
  */
-export type Look = 'plain' | 'model' | 'cyan';
+export type Look = 'plain' | 'model' | 'cyan' | 'hologram';
 
 /**
  * Draws rows of windows on building walls inside the material's shader.
@@ -72,6 +73,10 @@ function addWindows(material: THREE.MeshStandardMaterial) {
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= winShade;');
   };
 }
+
+/** `?demo=hotels` colours every 7th building orange to show the look. These are NOT real hotels. */
+const DEMO_HOTELS = new URLSearchParams(window.location.search).get('demo') === 'hotels' || import.meta.env.VITE_DEMO_HOTELS === '1';
+export const IS_DEMO_HOTELS = DEMO_HOTELS;
 
 const NODE_COUNT = 150;
 const MATAF_RADIUS = 68;
@@ -133,6 +138,16 @@ export class CityScene {
   private controls: OrbitControls;
   private sun = new THREE.DirectionalLight(0xffffff, 2.6);
   private sky = new THREE.HemisphereLight(0xffffff, 0xdddddd, 1.2);
+  private holo = Object.fromEntries(
+    (['edge', 'hotelEdge', 'haramEdge'] as const).map((k) => [
+      k,
+      {
+        fill: new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.09, depthWrite: false, side: THREE.DoubleSide }),
+        edge: new THREE.LineBasicMaterial({ transparent: true, opacity: 0.95 }),
+      },
+    ]),
+  ) as Record<'edge' | 'hotelEdge' | 'haramEdge', { fill: THREE.MeshBasicMaterial; edge: THREE.LineBasicMaterial }>;
+  private holoFloor = new THREE.MeshBasicMaterial();
   private mats = {
     ground: new THREE.MeshStandardMaterial({ roughness: 1 }),
     slab: new THREE.MeshStandardMaterial({ roughness: 1 }),
@@ -201,7 +216,15 @@ export class CityScene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    if (model) {
+    if (look === 'hologram') {
+      // Glow around the bright building edges instead of ambient occlusion.
+      const target = new THREE.WebGLRenderTarget(1, 1, { samples: small ? 0 : 4, type: THREE.HalfFloatType });
+      this.composer = new EffectComposer(this.renderer, target);
+      this.composer.addPass(new RenderPass(this.scene, this.camera));
+      this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.38, 0.35, 0.4));
+      this.composer.addPass(new OutputPass());
+      this.renderer.shadowMap.enabled = false;
+    } else if (model) {
       // Ambient occlusion darkens corners and the foot of each building.
       const target = new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType });
       this.composer = new EffectComposer(this.renderer, target);
@@ -487,10 +510,29 @@ export class CityScene {
       mesh.receiveShadow = true;
       root.add(mesh);
     };
+    if (this.look === 'hologram') {
+      this.addHologram(buildingGeometry(c, ['building', 'roof'], undefined, false, DEMO_HOTELS), root, 'edge');
+      this.addHologram(buildingGeometry(c, ['building', 'roof'], undefined, true, DEMO_HOTELS), root, 'hotelEdge');
+      this.addHologram(buildingGeometry(c, ['haram']), root, 'haramEdge');
+      // The open courtyard is a dark floor, so the pilgrims' dots and the Kaabah stand out on it.
+      const floor = matafGeometry(c);
+      if (floor) root.add(new THREE.Mesh(floor, this.holoFloor));
+      return;
+    }
     // Shade canopies ('roof') take the building colour, so the Haram's colour is used for the mosque only.
     addMerged(buildingGeometry(c, ['building', 'roof'], theme.baseShade ?? 0.8), this.mats.building);
     addMerged(buildingGeometry(c, ['haram']), this.mats.haram);
     addMerged(matafGeometry(c), this.mats.haram);
+  }
+
+  /** A see-through fill plus a bright outline. Their colours are set in setTheme. */
+  private addHologram(geo: THREE.BufferGeometry | null, root: THREE.Object3D, kind: 'edge' | 'hotelEdge' | 'haramEdge') {
+    if (!geo) return;
+    const fill = new THREE.Mesh(geo, this.holo[kind].fill);
+    fill.renderOrder = 1;
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 28), this.holo[kind].edge);
+    edges.renderOrder = 2;
+    root.add(fill, edges);
   }
 
   /** The regional map: flat ground, the sea, main roads and the railway. */
@@ -645,6 +687,14 @@ export class CityScene {
     this.mats.haram.color.set(t.haram);
     this.mats.kaabah.color.set(t.kaabah);
     this.mats.node.color.set(t.node);
+    if (t.edge !== undefined) {
+      this.holoFloor.color.set(t.holoFloor ?? t.ground);
+      const pairs = [['edge', t.edge, t.building], ['hotelEdge', t.hotelEdge ?? t.edge, t.hotelEdge ?? t.edge], ['haramEdge', t.haramEdge ?? t.edge, t.haram]] as const;
+      for (const [k, edge, fill] of pairs) {
+        this.holo[k].edge.color.set(edge);
+        this.holo[k].fill.color.set(fill);
+      }
+    }
     this.sun.color.set(t.sun);
     this.sun.intensity = t.sunIntensity;
     this.sun.shadow.intensity = t.shadowStrength ?? 1;

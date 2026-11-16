@@ -19,7 +19,7 @@ export interface CityData {
     safa?: [number, number];
     marwa?: [number, number];
   };
-  buildings: { kind: 'building' | 'haram' | 'roof'; h: number; min?: number; est?: 1; rings: number[][] }[];
+  buildings: { kind: 'building' | 'haram' | 'roof'; h: number; min?: number; est?: 1; hotel?: 1; rings: number[][] }[];
   roads: { w: number; pts: number[] }[];
 }
 
@@ -56,9 +56,15 @@ function extrude(rings: number[][], height: number, base = 0, baseShade?: number
   return geo;
 }
 
-export function buildingGeometry(data: CityData, kinds: string[], baseShade?: number) {
+/**
+ * Merged geometry for the buildings of the given kinds. `hotels` picks only hotels
+ * (true), only other buildings (false) or all of them (omitted).
+ * `demoHotels` marks every 7th building as a hotel: for a labelled demo only.
+ */
+export function buildingGeometry(data: CityData, kinds: string[], baseShade?: number, hotels?: boolean, demoHotels = false) {
   const parts = data.buildings
     .filter((b) => kinds.includes(b.kind))
+    .filter((b, i) => hotels === undefined || Boolean(demoHotels ? i % 7 === 0 : b.hotel) === hotels)
     .map((b) => extrude(b.rings, b.h, b.min ?? 0, baseShade));
   return parts.length ? mergeGeometries(parts) : null;
 }

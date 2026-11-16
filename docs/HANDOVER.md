@@ -220,3 +220,10 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 3. Try the map download once.
 4. Tell the owner, briefly, where things stand and ask the three open questions.
 5. Do not start stage 2 or change the default look until they answer.
+
+## Hologram look (owner's request, from a reference image)
+
+- `?look=hologram`: see-through blue buildings with glowing edges (`EdgesGeometry` plus a faint fill and a bloom pass) on a near-black ground, the mosque in teal, hotels in orange. Palette `HOLOGRAM` in `src/themes.ts`. It is NOT part of the Day scheme (cyan, orange, dark ground), so it is a comparison look until the owner approves it. Pins, labels and the sheet are unchanged and still need a contrast check on the dark map.
+- **Hotels are not in the data yet.** The baked city files have no hotel flag and the raw OpenStreetMap exports are not in the repository. `scripts/bake-osm.mjs` now writes `hotel: 1` from `tourism=hotel|hostel|guest_house|motel` (parts inherit it), but this is untested: rerun the bake with the raw exports to get real orange hotels. Untagged hotels will not be marked.
+- `?demo=hotels` (or `VITE_DEMO_HOTELS=1`) colours every 7th building orange to show the look. These are random, not hotels, and the screen says so. The published preview is built with this demo and `VITE_DEFAULT_LOOK=hologram`.
+- Not done: the green "selected place" building from the reference. Cost on real phones is unmeasured (see-through layers and bloom).

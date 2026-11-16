@@ -103,6 +103,10 @@ function assemble(segments) {
   return rings;
 }
 
+// Tourism tags that count as a hotel for the hologram look's orange buildings.
+// OpenStreetMap tagging is incomplete: an untagged hotel is not marked.
+const HOTEL_TAGS = ['hotel', 'hostel', 'guest_house', 'motel'];
+
 const flat = (ring) => ring.slice(0, -1).flatMap(toXZ);
 
 /** True if point p lies inside the ring (both in lat/lon). */
@@ -157,7 +161,7 @@ for (const e of els) {
   const kind = isMosque(e) || special || minaret ? 'haram' : t.building === 'roof' ? 'roof' : 'building';
   for (const o of outer) {
     // `simple`: kept as plain massing even if detailed parts exist inside it.
-    footprints.push({ kind, h, est, min: minHeightOf(t), outer: o, holes: inner.filter((r) => inside(r[0], o)), simple: special });
+    footprints.push({ kind, h, est, hotel: HOTEL_TAGS.includes(t.tourism), min: minHeightOf(t), outer: o, holes: inner.filter((r) => inside(r[0], o)), simple: special });
   }
 }
 
@@ -182,6 +186,8 @@ if (existsSync(partsFile)) {
       const { h, est } = heightOf(t);
       parts.push({
         kind: inHaram ? 'haram' : 'building',
+        // A part of a hotel is part of the hotel, unless it carries its own tourism tag.
+        hotel: t.tourism ? HOTEL_TAGS.includes(t.tourism) : Boolean(host?.hotel),
         h,
         est,
         min: minHeightOf(t),
@@ -198,6 +204,7 @@ for (const f of [...footprints.filter((f) => !f.replaced && !f.hidden), ...parts
   if (f.h <= f.min) continue;
   const b = { kind: f.kind, h: r1(f.h), rings: [flat(f.outer), ...f.holes.map(flat)] };
   if (f.min > 0) b.min = r1(f.min);
+  if (f.hotel) b.hotel = 1;
   if (f.est) {
     b.est = 1;
     estimated++;

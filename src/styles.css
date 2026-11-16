@@ -114,7 +114,9 @@ button:focus-visible {
   width: 44px;
   height: 44px;
   margin: -44px 0 0 -22px;
-  pointer-events: auto;
+  /* Touches pass through to the map, so pinching or dragging over a pin moves the
+     map. Taps are matched to pins in App.tsx (tapAt). Keyboard focus still works. */
+  pointer-events: none;
 }
 
 .pin-badge {
@@ -391,7 +393,7 @@ h1 {
   gap: 6px;
   border: 0;
   background: none;
-  pointer-events: auto;
+  pointer-events: none; /* see .pin */
   will-change: transform;
 }
 
@@ -469,7 +471,7 @@ h1 {
   font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
-  pointer-events: auto;
+  pointer-events: none; /* see .pin */
   box-shadow: 0 1px 4px rgba(13, 20, 36, 0.14);
 }
 

@@ -311,17 +311,20 @@ export class CityScene {
     this.overview = { center: sphere.center, radius: sphere.radius, box };
 
     // Map-style gestures, at the owner's request: one finger drags the map; two
-    // fingers pinch to zoom, drag sideways to rotate and drag up or down to tilt.
-    // A mouse drags with the left button and rotates and tilts with the right.
+    // fingers pinch to zoom towards the point between them and drag to move.
+    // Two fingers no longer rotate or tilt: fingers always drift a little while
+    // pinching, which turned and tilted the map by accident. Rotating and tilting
+    // are on the map buttons. A mouse drags with the left button, rotates and
+    // tilts with the right, and the wheel zooms towards the pointer.
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.minDistance = MIN_DISTANCE;
     this.controls.maxDistance = this.region ? MAX_DISTANCE_REGION : MAX_DISTANCE;
-    // Zooming spans metres to hundreds of kilometres with the regional map, so each pinch goes further.
-    if (this.region) this.controls.zoomSpeed = 1.6;
+    // Pinching stays at 1:1 with the fingers (zoomSpeed 1), so the place under them stays under them.
     this.controls.minPolarAngle = MIN_POLAR;
     this.controls.maxPolarAngle = MAX_POLAR;
-    this.controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
+    this.controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
+    this.controls.zoomToCursor = true;
     this.controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
     // Drag across the ground, not across the screen, so tilted views slide like a map.
     this.controls.screenSpacePanning = false;

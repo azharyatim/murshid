@@ -86,7 +86,7 @@ From the owner's original brief.
 
 One screen: an overview map of the Haram area with a bottom sheet.
 
-- **Map behaviour.** The default is a north-up aerial view framed so that every step pin is visible. Map-style gestures (owner's request, after nuzul-atlas.app, which the session could not reach): one finger drags the map; two fingers pinch to zoom, drag sideways to rotate, drag up or down to tilt. Four on-map buttons (zoom in, zoom out, rotate, 2D/3D tilt) make it keyboard-accessible.
+- **Map behaviour.** The default is a north-up aerial view framed so that every step pin is visible. Map-style gestures (owner's request, after nuzul-atlas.app, which the session could not reach): one finger drags the map; two fingers pinch to zoom towards the point between them and drag to move. Two fingers do not rotate or tilt (changed 16 Nov 2026: the owner found pinching at the far-out map turned and tilted it by accident); rotate and tilt are on the map buttons. Four on-map buttons (zoom in, zoom out, rotate, 2D/3D tilt) make it keyboard-accessible.
 - **Pins.** Steps 3 to 7 are numbered pins on the map. Steps 1 and 2 happen at the miqat, tens to hundreds of kilometres away, so they are a "1 2 At the miqat, before Makkah" chip at the top. The plan is for that chip to open a regional miqat view in stage 3. The owner has not confirmed this approach.
 - **Sheet.** Names the selected step, shows a one-line summary, and has a row of seven number buttons. "Show all" returns to the aerial view.
 - **Nodes.** 150 dots circle the Kaabah anticlockwise. They stop when the device asks for reduced motion.

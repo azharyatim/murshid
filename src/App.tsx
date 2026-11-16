@@ -163,6 +163,35 @@ export function App() {
     setTilted(false);
   };
 
+  // Pins let touches through to the map (so pinching over a city name zooms the
+  // map). A quick tap that did not move is matched to the pin under it here.
+  const tapStart = useRef<{ x: number; y: number; t: number; id: number } | null>(null);
+  const pointersDown = useRef(0);
+  const onMapPointerDown = (e: React.PointerEvent) => {
+    pointersDown.current += 1;
+    tapStart.current = pointersDown.current === 1 ? { x: e.clientX, y: e.clientY, t: e.timeStamp, id: e.pointerId } : null;
+  };
+  const onMapPointerUp = (e: React.PointerEvent) => {
+    pointersDown.current = Math.max(0, pointersDown.current - 1);
+    const start = tapStart.current;
+    tapStart.current = null;
+    if (!start || start.id !== e.pointerId) return;
+    if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 8 || e.timeStamp - start.t > 600) return;
+    tapAt(e.clientX, e.clientY);
+  };
+  const tapAt = (x: number, y: number) => {
+    let best: { el: HTMLElement; d: number } | null = null;
+    for (const el of pinEls.current.values()) {
+      if (el.tagName !== 'BUTTON' || el.style.visibility !== 'visible') continue;
+      // A city name's visible box is its inner label; other pins are their own 44px box.
+      const r = (el.classList.contains('city-label') ? el.firstElementChild! : el).getBoundingClientRect();
+      if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+      const d = Math.hypot(x - (r.left + r.right) / 2, y - (r.top + r.bottom) / 2);
+      if (!best || d < best.d) best = { el, d };
+    }
+    best?.el.click();
+  };
+
   const setPinEl = (key: string) => (el: HTMLElement | null) => {
     if (el) pinEls.current.set(key, el);
   };
@@ -174,7 +203,16 @@ export function App() {
   return (
     <div className="app" data-look={LOOK}>
       <div className="stage">
-        <canvas ref={canvasRef} aria-hidden="true" />
+        <canvas
+          ref={canvasRef}
+          aria-hidden="true"
+          onPointerDown={onMapPointerDown}
+          onPointerUp={onMapPointerUp}
+          onPointerCancel={() => {
+            pointersDown.current = Math.max(0, pointersDown.current - 1);
+            tapStart.current = null;
+          }}
+        />
 
         <div className="pins">
           {PLACES.map((p) => (

@@ -355,17 +355,17 @@ export class CityScene {
   }
 
   /**
-   * Two-finger gestures with locking. For the first few millimetres the gesture
-   * is undecided; it then becomes a pinch (fingers apart or together: zoom, and
-   * the pair can also drag), a twist (fingers turning: rotate) or a tilt (both
-   * fingers sliding up or down together), and stays that until the fingers lift.
-   * So drift during a pinch can no longer turn or tilt the map by accident.
-   * Pinch and twist keep the ground point between the fingers under the fingers.
+   * Two-finger gestures, matched to nuzul-atlas.app: pinch, twist and slide all
+   * work at the same time, around the point between the fingers, so the place
+   * under the fingers stays under them. The one exception is tilt: if both
+   * fingers slide up or down together without pinching or twisting, the gesture
+   * becomes a tilt and stays one until the fingers lift (nuzul-atlas has no
+   * tilt; the owner asked for it earlier, so it is kept apart from the rest).
    */
   private setupTwoFingerGestures() {
     const el = this.canvas;
     const touches = new Map<number, { x: number; y: number }>();
-    type Mode = 'undecided' | 'pinch' | 'twist' | 'tilt';
+    type Mode = 'undecided' | 'free' | 'tilt';
     let mode: Mode = 'undecided';
     let start: { dist: number; angle: number; a: { x: number; y: number }; b: { x: number; y: number } } | null = null;
     let prev: { dist: number; angle: number; mid: { x: number; y: number } } | null = null;
@@ -399,19 +399,17 @@ export class CityScene {
       if (touches.size !== 2 || !start || !prev) return;
       const p = pair();
       if (mode === 'undecided') {
+        // Wait until both fingers have moved: events arrive one finger at a time, and one finger's move alone looks like a twist.
+        if (Math.min(Math.hypot(p.a.x - start.a.x, p.a.y - start.a.y), Math.hypot(p.b.x - start.b.x, p.b.y - start.b.y)) < 10) return;
         const scale = Math.abs(Math.log(p.dist / start.dist));
         const turn = Math.abs(angleDiff(p.angle, start.angle));
         const dyA = p.a.y - start.a.y;
         const dyB = p.b.y - start.b.y;
-        const together = Math.sign(dyA) === Math.sign(dyB) && Math.min(Math.abs(dyA), Math.abs(dyB)) > 18;
-        if (together && scale < 0.1 && turn < 0.12) mode = 'tilt';
-        else if (turn > 0.17) mode = 'twist'; // about 10 degrees
-        else if (scale > 0.08) mode = 'pinch'; // about 8% closer or further apart
-        else if (Math.hypot(p.mid.x - prev.mid.x, p.mid.y - prev.mid.y) > 0 && scale < 0.03 && turn < 0.05 && !together) {
-          // Both fingers moving sideways together with no pinch or twist: treat as a drag.
-          const da = Math.hypot(p.a.x - start.a.x, p.a.y - start.a.y);
-          if (da > 24) mode = 'pinch';
-        }
+        const together = Math.sign(dyA) === Math.sign(dyB) && Math.min(Math.abs(dyA), Math.abs(dyB)) > 16;
+        const moved = Math.max(Math.hypot(dyA, p.a.x - start.a.x), Math.hypot(dyB, p.b.x - start.b.x));
+        if (turn > 0.1 || scale > 0.07) mode = 'free';
+        else if (together) mode = 'tilt';
+        else if (moved > 24) mode = 'free';
         if (mode === 'undecided') return;
         prev = { dist: p.dist, angle: p.angle, mid: p.mid };
         return;
@@ -420,10 +418,9 @@ export class CityScene {
       const anchor = this.groundAt(prev.mid.x, prev.mid.y);
       const offset = this.camera.position.clone().sub(this.controls.target);
       const sph = new THREE.Spherical().setFromVector3(offset);
-      if (mode === 'pinch') {
+      if (mode === 'free') {
         sph.radius = THREE.MathUtils.clamp((sph.radius * prev.dist) / p.dist, this.controls.minDistance, this.controls.maxDistance);
-      } else if (mode === 'twist') {
-        sph.theta -= angleDiff(p.angle, prev.angle);
+        sph.theta += angleDiff(p.angle, prev.angle);
       } else {
         // Sliding up tilts towards the horizon, sliding down looks straight down.
         sph.phi = THREE.MathUtils.clamp(sph.phi - ((p.mid.y - prev.mid.y) / el.clientHeight) * Math.PI * 0.9, MIN_POLAR, MAX_POLAR);

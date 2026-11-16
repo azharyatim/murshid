@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { MIQATS } from './data/miqats';
 import { CityScene, type Look, type Pin } from './scene/CityScene';
 import {
   CLAY,
@@ -79,6 +80,8 @@ export function App() {
   const [selected, setSelected] = useState<number | null>(null);
   const [placeId, setPlaceId] = useState<string | null>(null);
   const [tilted, setTilted] = useState(false);
+  const [miqatOpen, setMiqatOpen] = useState(false);
+  const [miqatId, setMiqatId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<CityScene | null>(null);
   const pinEls = useRef(new Map<string, HTMLElement>());
@@ -145,6 +148,8 @@ export function App() {
   const choose = (n: number | null) => {
     setSelected(n);
     setPlaceId(null);
+    setMiqatOpen(n !== null && STEPS.find((s) => s.n === n)?.pos === null);
+    setMiqatId(null);
     const step = STEPS.find((s) => s.n === n);
     if (step?.pos) sceneRef.current?.focus(toScene(step.pos));
     else sceneRef.current?.showAll();
@@ -152,6 +157,7 @@ export function App() {
   };
 
   const choosePlace = (p: Place) => {
+    setMiqatOpen(false);
     setSelected(null);
     setPlaceId(p.id);
     sceneRef.current?.focus(sitePos(p), focusDistance(p));
@@ -300,6 +306,47 @@ export function App() {
           </button>
         </div>
 
+        {miqatOpen && (
+          <div className="miqat-map" role="group" aria-label="The five miqats around Makkah">
+            <svg viewBox="-150 -235 300 360" preserveAspectRatio="xMidYMid meet">
+              <circle r="55" className="mm-ring" />
+              <circle r="100" className="mm-ring" />
+              <circle r="8" className="mm-kaabah" />
+              <text y="24" className="mm-label">Makkah</text>
+              {MIQATS.map((m) => {
+                const a = (m.bearing * Math.PI) / 180;
+                const x = Math.sin(a) * 100;
+                const y = -Math.cos(a) * 100;
+                const on = miqatId === m.id;
+                const below = m.bearing > 90 && m.bearing < 270;
+                return (
+                  <g
+                    key={m.id}
+                    className={`mm-pin${on ? ' is-on' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={on}
+                    aria-label={m.name}
+                    onClick={() => setMiqatId(m.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setMiqatId(m.id);
+                      }
+                    }}
+                  >
+                    <line x1={Math.sin(a) * 8} y1={-Math.cos(a) * 8} x2={x} y2={y} className="mm-line" />
+                    <circle cx={x} cy={y} r="24" className="mm-hit" />
+                    <circle cx={x} cy={y} r="6" className="mm-dot" />
+                    <text x={x} y={below ? y + 20 : y - 12} className="mm-label">{m.name}</text>
+                  </g>
+                );
+              })}
+            </svg>
+            <p className="mm-note">Schematic only. Directions are approximate and distances are not to scale.</p>
+          </div>
+        )}
+
         <p className="notice">
           {city
             ? 'Map © OpenStreetMap. Some heights estimated.'
@@ -346,6 +393,7 @@ export function App() {
               {step ? step.summary : 'Tap a number on the map or below to see where a step takes place.'}
             </p>
           )}
+          {miqatOpen && <MiqatCard id={miqatId} />}
           <ol className="stepper" aria-label="Steps">
             {STEPS.map((s) => (
               <li key={s.n}>
@@ -364,5 +412,34 @@ export function App() {
         </div>
       </main>
     </div>
+  );
+}
+
+function MiqatCard({ id }: { id: string | null }) {
+  const m = MIQATS.find((x) => x.id === id);
+  if (!m) {
+    return (
+      <p className="mq-hint">
+        There are five miqats. Tap one on the map to see who it is for and the hadith it comes from.
+      </p>
+    );
+  }
+  return (
+    <section className="mq-card" aria-label={m.name}>
+      <h2>{m.name}</h2>
+      <p>
+        <strong>For:</strong> {m.forPeople}
+      </p>
+      <p className="mq-dir">Direction: {m.direction} (approximate).</p>
+      {m.sources.map((src) => (
+        <blockquote key={src.url + src.label}>
+          <p>“{src.quote}”</p>
+          <footer>
+            {src.label}. <a href={src.url} target="_blank" rel="noreferrer">Verify</a>. Grade: not given by the source tool.
+          </footer>
+        </blockquote>
+      ))}
+      {m.note && <p className="mq-flag">For scholar review: {m.note}</p>}
+    </section>
   );
 }

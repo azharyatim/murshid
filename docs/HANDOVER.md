@@ -220,3 +220,7 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 3. Try the map download once.
 4. Tell the owner, briefly, where things stand and ask the three open questions.
 5. Do not start stage 2 or change the default look until they answer.
+
+## Hologram look: tried and scrapped
+
+The owner asked for a hologram look (see-through glowing buildings on a dark ground, hotels in orange) and then found it too difficult to view, so it was removed (15 Nov 2026). Do not rebuild it. The Day look is the default again. The hotel flag in the bake script went with it; hotels would need the raw OpenStreetMap export again if they are ever wanted.

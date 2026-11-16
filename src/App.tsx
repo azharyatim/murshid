@@ -131,6 +131,8 @@ export function App() {
     }
     scene.setPins(pins);
     sceneRef.current = scene;
+    // Test builds only: lets automated tests read the camera. Not in the preview or the app.
+    if (import.meta.env.DEV) (window as unknown as { __scene: CityScene }).__scene = scene;
     const onChange = () => scene.setReducedMotion(mq.matches);
     mq.addEventListener('change', onChange);
     return () => {

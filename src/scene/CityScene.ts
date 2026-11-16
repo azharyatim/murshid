@@ -310,12 +310,11 @@ export class CityScene {
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     this.overview = { center: sphere.center, radius: sphere.radius, box };
 
-    // Map-style gestures, at the owner's request: one finger drags the map; two
-    // fingers pinch to zoom towards the point between them and drag to move.
-    // Two fingers no longer rotate or tilt: fingers always drift a little while
-    // pinching, which turned and tilted the map by accident. Rotating and tilting
-    // are on the map buttons. A mouse drags with the left button, rotates and
-    // tilts with the right, and the wheel zooms towards the pointer.
+    // Map-style gestures, at the owner's request: one finger drags the map. Two
+    // fingers are handled by setupTwoFingerGestures (below): pinch to zoom, twist
+    // to rotate, slide up or down together to tilt, each locked for the gesture.
+    // A mouse drags with the left button, rotates and tilts with the right, and
+    // the wheel zooms towards the pointer.
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.minDistance = MIN_DISTANCE;
@@ -323,7 +322,7 @@ export class CityScene {
     // Pinching stays at 1:1 with the fingers (zoomSpeed 1), so the place under them stays under them.
     this.controls.minPolarAngle = MIN_POLAR;
     this.controls.maxPolarAngle = MAX_POLAR;
-    this.controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
+    this.controls.touches = { ONE: THREE.TOUCH.PAN, TWO: null };
     this.controls.zoomToCursor = true;
     this.controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
     // Drag across the ground, not across the screen, so tilted views slide like a map.
@@ -345,6 +344,7 @@ export class CityScene {
       this.needsRender = true;
     });
     this.controls.addEventListener('start', () => (this.flight = null));
+    this.setupTwoFingerGestures();
 
     this.setTheme(theme);
     this.resize();
@@ -352,6 +352,123 @@ export class CityScene {
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas.parentElement ?? canvas);
     this.raf = requestAnimationFrame(this.tick);
+  }
+
+  /**
+   * Two-finger gestures with locking. For the first few millimetres the gesture
+   * is undecided; it then becomes a pinch (fingers apart or together: zoom, and
+   * the pair can also drag), a twist (fingers turning: rotate) or a tilt (both
+   * fingers sliding up or down together), and stays that until the fingers lift.
+   * So drift during a pinch can no longer turn or tilt the map by accident.
+   * Pinch and twist keep the ground point between the fingers under the fingers.
+   */
+  private setupTwoFingerGestures() {
+    const el = this.canvas;
+    const touches = new Map<number, { x: number; y: number }>();
+    type Mode = 'undecided' | 'pinch' | 'twist' | 'tilt';
+    let mode: Mode = 'undecided';
+    let start: { dist: number; angle: number; a: { x: number; y: number }; b: { x: number; y: number } } | null = null;
+    let prev: { dist: number; angle: number; mid: { x: number; y: number } } | null = null;
+
+    const pair = () => {
+      const [a, b] = [...touches.values()];
+      return {
+        a,
+        b,
+        dist: Math.hypot(b.x - a.x, b.y - a.y),
+        angle: Math.atan2(b.y - a.y, b.x - a.x),
+        mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+      };
+    };
+    const angleDiff = (x: number, y: number) => Math.atan2(Math.sin(x - y), Math.cos(x - y));
+
+    el.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) {
+        const p = pair();
+        start = { dist: p.dist, angle: p.angle, a: { ...p.a }, b: { ...p.b } };
+        prev = { dist: p.dist, angle: p.angle, mid: p.mid };
+        mode = 'undecided';
+        this.flight = null;
+      }
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'touch' || !touches.has(e.pointerId)) return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size !== 2 || !start || !prev) return;
+      const p = pair();
+      if (mode === 'undecided') {
+        const scale = Math.abs(Math.log(p.dist / start.dist));
+        const turn = Math.abs(angleDiff(p.angle, start.angle));
+        const dyA = p.a.y - start.a.y;
+        const dyB = p.b.y - start.b.y;
+        const together = Math.sign(dyA) === Math.sign(dyB) && Math.min(Math.abs(dyA), Math.abs(dyB)) > 18;
+        if (together && scale < 0.1 && turn < 0.12) mode = 'tilt';
+        else if (turn > 0.17) mode = 'twist'; // about 10 degrees
+        else if (scale > 0.08) mode = 'pinch'; // about 8% closer or further apart
+        else if (Math.hypot(p.mid.x - prev.mid.x, p.mid.y - prev.mid.y) > 0 && scale < 0.03 && turn < 0.05 && !together) {
+          // Both fingers moving sideways together with no pinch or twist: treat as a drag.
+          const da = Math.hypot(p.a.x - start.a.x, p.a.y - start.a.y);
+          if (da > 24) mode = 'pinch';
+        }
+        if (mode === 'undecided') return;
+        prev = { dist: p.dist, angle: p.angle, mid: p.mid };
+        return;
+      }
+      this.camera.updateMatrixWorld();
+      const anchor = this.groundAt(prev.mid.x, prev.mid.y);
+      const offset = this.camera.position.clone().sub(this.controls.target);
+      const sph = new THREE.Spherical().setFromVector3(offset);
+      if (mode === 'pinch') {
+        sph.radius = THREE.MathUtils.clamp((sph.radius * prev.dist) / p.dist, this.controls.minDistance, this.controls.maxDistance);
+      } else if (mode === 'twist') {
+        sph.theta -= angleDiff(p.angle, prev.angle);
+      } else {
+        // Sliding up tilts towards the horizon, sliding down looks straight down.
+        sph.phi = THREE.MathUtils.clamp(sph.phi - ((p.mid.y - prev.mid.y) / el.clientHeight) * Math.PI * 0.9, MIN_POLAR, MAX_POLAR);
+      }
+      sph.makeSafe();
+      this.camera.position.copy(this.controls.target).add(offset.setFromSpherical(sph));
+      this.camera.lookAt(this.controls.target);
+      this.camera.updateMatrixWorld();
+      if (mode !== 'tilt' && anchor) {
+        // Keep the ground point that was between the fingers under the fingers now.
+        const now = this.groundAt(p.mid.x, p.mid.y);
+        if (now) {
+          const shift = anchor.sub(now);
+          shift.y = 0;
+          this.controls.target.add(shift);
+          this.camera.position.add(shift);
+          // Refresh the camera now, or the next finger movement measures from a stale view and the map drifts.
+          this.camera.updateMatrixWorld();
+        }
+      }
+      prev = { dist: p.dist, angle: p.angle, mid: p.mid };
+      this.needsRender = true;
+    });
+    const end = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      touches.delete(e.pointerId);
+      if (touches.size < 2) {
+        start = null;
+        prev = null;
+        mode = 'undecided';
+      }
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+  }
+
+  private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+  /** The point on the ground under a screen position, or null if that point looks above the horizon. */
+  private groundAt(clientX: number, clientY: number) {
+    const r = this.canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    this.raycaster.setFromCamera(ndc, this.camera);
+    this.raycaster.far = Infinity;
+    return this.raycaster.ray.intersectPlane(this.groundPlane, new THREE.Vector3());
   }
 
   /** Where a city's local origin sits on the regional map. */
@@ -584,6 +701,11 @@ export class CityScene {
       toTarget: target.clone(),
       t: 0,
     };
+  }
+
+  /** For automated tests: the camera's distance, compass direction and tilt. */
+  debugView() {
+    return { distance: Math.round(this.distance()), azimuth: +this.controls.getAzimuthalAngle().toFixed(3), polar: +this.controls.getPolarAngle().toFixed(3) };
   }
 
   private distance() {

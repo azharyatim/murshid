@@ -149,6 +149,16 @@ export class CityScene {
   private makkah = new THREE.Group();
   private region: RegionData | null = null;
   private sunOffset = new THREE.Vector3(-520, 720, 380);
+  /**
+   * Flat layers lying on the ground (sea, streets, road lines), each lifted a
+   * little more than the one below. The lift grows with viewing distance: far
+   * out, layers a few centimetres apart cannot be told apart by the depth
+   * buffer and flicker ("z-fighting").
+   */
+  private flatLayers: { obj: THREE.Object3D; level: number }[] = [];
+  /** Turns world positions into the sun's view and back, to keep shadows steady while the view moves. */
+  private sunRotation = new THREE.Matrix4().lookAt(new THREE.Vector3(), new THREE.Vector3(520, -720, -380), new THREE.Vector3(0, 1, 0));
+  private sunRotationInverse = this.sunRotation.clone().invert();
   private nodes: TawafNode[] = [];
   private nodeMesh: THREE.InstancedMesh;
   private dummy = new THREE.Object3D();
@@ -352,6 +362,7 @@ export class CityScene {
     const roads = new THREE.Mesh(roadGeometry(c), this.mats.road);
     roads.receiveShadow = true;
     root.add(roads);
+    this.flatLayers.push({ obj: roads, level: 2 });
     const addMerged = (geo: THREE.BufferGeometry | null, mat: THREE.Material) => {
       if (!geo) return;
       const mesh = new THREE.Mesh(geo, mat);
@@ -375,13 +386,21 @@ export class CityScene {
       const sea = new THREE.Mesh(flatPolygon(r.sea, 0.05), this.mats.sea);
       sea.receiveShadow = true;
       this.scene.add(sea);
-      r.islands.forEach((ring) => this.scene.add(new THREE.Mesh(flatPolygon(ring, 0.08), this.mats.ground)));
+      this.flatLayers.push({ obj: sea, level: 1 });
+      r.islands.forEach((ring) => {
+        const island = new THREE.Mesh(flatPolygon(ring, 0.08), this.mats.ground);
+        this.scene.add(island);
+        this.flatLayers.push({ obj: island, level: 1.5 });
+      });
     }
     // Main roads and the railway as thin lines, so they stay visible from far away.
-    this.scene.add(new THREE.LineSegments(polylineGeometry(r.roads.map((x) => x.pts), 0.5), this.mats.regionRoad));
+    const roads = new THREE.LineSegments(polylineGeometry(r.roads.map((x) => x.pts), 0.5), this.mats.regionRoad);
+    this.scene.add(roads);
+    this.flatLayers.push({ obj: roads, level: 3 });
     const rail = new THREE.LineSegments(polylineGeometry(r.rail, 0.6), this.mats.rail);
     rail.computeLineDistances();
     this.scene.add(rail);
+    this.flatLayers.push({ obj: rail, level: 4 });
   }
 
   /** Hills in stacked contour layers, like a cut-card site model. Illustrative only. */
@@ -705,7 +724,9 @@ export class CityScene {
    */
   private fitToDistance() {
     const d = this.distance();
-    const near = THREE.MathUtils.clamp(d * 0.01, 1, 20_000);
+    // A nearer near plane wastes depth precision; even the steepest tilt keeps the
+    // ground well over a quarter of the viewing distance away.
+    const near = THREE.MathUtils.clamp(d * 0.05, 1, 80_000);
     const far = d * 12 + 6000;
     if (Math.abs(near - this.camera.near) > near * 0.05 || Math.abs(far - this.camera.far) > far * 0.05) {
       this.camera.near = near;
@@ -716,9 +737,17 @@ export class CityScene {
       this.scene.fog.near = d * 2.6;
       this.scene.fog.far = d * 7;
     }
-    const t = this.controls.target;
-    this.sun.position.copy(t).add(this.sunOffset);
+    for (const { obj, level } of this.flatLayers) obj.position.y = level * d * 0.0001;
+    // The sun's shadow area follows the view. Move it only in whole shadow-map
+    // texels, seen from the sun, so shadow edges do not crawl while dragging.
+    const sc = this.sun.shadow.camera;
+    const texel = (sc.right - sc.left) / this.sun.shadow.mapSize.width;
+    const t = this.tmp.copy(this.controls.target).applyMatrix4(this.sunRotationInverse);
+    t.x = Math.round(t.x / texel) * texel;
+    t.y = Math.round(t.y / texel) * texel;
+    t.applyMatrix4(this.sunRotation);
     this.sun.target.position.copy(t);
+    this.sun.position.copy(t).add(this.sunOffset);
     // Dashes about 0.6% of the viewing distance long, so the railway reads as dashed at every zoom.
     this.mats.rail.scale = 1 / (d * 0.006);
   }

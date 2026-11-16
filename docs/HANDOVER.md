@@ -85,7 +85,7 @@ From the owner's original brief.
 
 One screen: an overview map of the Haram area with a bottom sheet.
 
-- **Map behaviour.** The default is a north-up aerial view framed so that every step pin is visible. One finger rotates and tilts, two fingers pinch to zoom and drag to move. Four on-map buttons (zoom in, zoom out, rotate, 2D/3D tilt) make it keyboard-accessible.
+- **Map behaviour.** The default is a north-up aerial view framed so that every step pin is visible. One finger drags the map. Two fingers pinch to zoom, twist to rotate and slide to move, around the point between them (copied from nuzul-atlas.app). Tilt is the 3D button only. Four on-map buttons (zoom in, zoom out, rotate, 2D/3D tilt) make it keyboard-accessible.
 - **Pins.** Steps 3 to 7 are numbered pins on the map. Steps 1 and 2 happen at the miqat, tens to hundreds of kilometres away, so they are a "1 2 At the miqat, before Makkah" chip at the top. The plan is for that chip to open a regional miqat view in stage 3. The owner has not confirmed this approach.
 - **Sheet.** Names the selected step, shows a one-line summary, and has a row of seven number buttons. "Show all" returns to the aerial view.
 - **Nodes.** 150 dots circle the Kaabah anticlockwise. They stop when the device asks for reduced motion.
@@ -159,3 +159,8 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 3. Try the map download once.
 4. Tell the owner, briefly, where things stand and ask the three open questions.
 5. Do not start stage 2 or change the default look until they answer.
+
+## Update: gestures and miqats
+
+- **Gestures** now follow nuzul-atlas.app (read from its published script): one finger pans; two fingers pinch, twist and slide together around their midpoint. Mouse: drag pans, wheel zooms, double-click zooms in, shift- or right-drag rotates and tilts. OrbitControls is gone; see `bindGestures` in `CityScene.ts`. Tried only with synthetic pointer events in headless Chromium, not on a real phone.
+- **Miqats.** The "At the miqat" chip opens a schematic of the five miqats around Makkah (`src/data/miqats.ts`). Names and who each is for are quoted from the Hadith tool (Bukhari 1478 and 1479, Nasa'i 2658) with the tool's URLs; the tool gives no grade. Pin directions come from the Bulugh al-Maram commentary the tool returned. **No coordinates or distances are shown**: OpenStreetMap was still unreachable and web sources disagree. Dhat 'Irq is flagged for scholar review (Aishah's report vs Umar fixing it). Not yet covered: pilgrims arriving by air or via Jeddah, and anyone living inside the miqat area beyond the quoted line.

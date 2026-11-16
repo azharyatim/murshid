@@ -341,3 +341,49 @@ h1 {
   font-size: 15px;
   white-space: nowrap;
 }
+
+/* Miqat regional view: a schematic, not a real map. */
+.miqat-map {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  z-index: 2;
+}
+.miqat-map svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.mm-ring { fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; }
+.mm-line { stroke: var(--muted); stroke-width: 1; }
+.mm-kaabah { fill: var(--ink); }
+.mm-label { font-size: 11px; fill: var(--ink); text-anchor: middle; font-weight: 600; }
+.mm-dot { fill: var(--sheet); stroke: var(--ink); stroke-width: 2; }
+.mm-dot.is-on { fill: var(--accent); }
+.mm-pin { cursor: pointer; outline: none; }
+.mm-pin:focus-visible .mm-dot { stroke: var(--accent); stroke-width: 4; }
+.mm-hit { fill: transparent; }
+.mm-pin.is-on .mm-label { fill: var(--accent); }
+.mm-note {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 12px;
+  margin: 0;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mq-hint { color: var(--muted); font-size: 14px; margin: 8px 0; }
+.mq-card { max-height: 22dvh; overflow: auto; font-size: 14px; margin: 8px 0; }
+.mq-card h2 { font-size: 18px; margin: 0 0 4px; }
+.mq-card p { margin: 4px 0; }
+.mq-card blockquote { margin: 8px 0; padding: 6px 10px; border-left: 3px solid var(--line); color: var(--muted); }
+.mq-card blockquote p { margin: 0; }
+.mq-card footer { font-size: 12px; margin-top: 4px; }
+.mq-card a { color: var(--accent); }
+.mq-flag { background: #fff6e0; padding: 6px 10px; border-radius: 8px; }
+.mq-dir { color: var(--muted); }

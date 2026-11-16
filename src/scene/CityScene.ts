@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
@@ -80,10 +79,8 @@ export interface Pin {
 }
 
 interface Flight {
-  fromPos: THREE.Vector3;
-  toPos: THREE.Vector3;
-  fromTarget: THREE.Vector3;
-  toTarget: THREE.Vector3;
+  from: { target: THREE.Vector3; dist: number; azimuth: number; polar: number };
+  to: { target: THREE.Vector3; dist: number; azimuth: number; polar: number };
   t: number;
 }
 
@@ -96,7 +93,12 @@ export class CityScene {
   private composer: EffectComposer | null = null;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(32, 1, 10, 6000);
-  private controls: OrbitControls;
+  /** The camera orbits `target` at `dist`; `azimuth` 0 is north-up, `polar` 0 is straight down. */
+  private view = { target: new THREE.Vector3(), dist: 1500, azimuth: 0, polar: AERIAL_POLAR };
+  private pointers = new Map<number, [number, number]>();
+  private lastGesture: { mid: [number, number]; dist: number; angle: number } | null = null;
+  private ray = new THREE.Raycaster();
+  private ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private sun = new THREE.DirectionalLight(0xffffff, 2.6);
   private sky = new THREE.HemisphereLight(0xffffff, 0xdddddd, 1.2);
   private mats = {
@@ -210,26 +212,11 @@ export class CityScene {
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     this.overview = { center: sphere.center, radius: sphere.radius };
 
-    // Touch: one finger rotates and tilts, two fingers pinch to zoom and drag to move.
-    this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.enableDamping = true;
-    this.controls.minDistance = MIN_DISTANCE;
-    this.controls.maxDistance = MAX_DISTANCE;
-    this.controls.minPolarAngle = MIN_POLAR;
-    this.controls.maxPolarAngle = MAX_POLAR;
-    this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
-    this.controls.addEventListener('change', () => {
-      // Keep the view from being dragged away from the Haram area.
-      const t = this.controls.target;
-      const d = Math.hypot(t.x, t.z);
-      if (d > 700) {
-        t.x *= 700 / d;
-        t.z *= 700 / d;
-      }
-      t.y = 0;
-      this.needsRender = true;
-    });
-    this.controls.addEventListener('start', () => (this.flight = null));
+    // Gestures, matching nuzul-atlas: one finger drags the map. Two fingers
+    // pinch to zoom, twist to rotate and slide to move, all around the point
+    // between the fingers. Mouse: drag moves, wheel zooms, shift-drag or
+    // right-drag rotates and tilts, double-click zooms in.
+    this.bindGestures();
 
     this.setTheme(theme);
     this.resize();
@@ -378,33 +365,133 @@ export class CityScene {
 
   // Camera moves ------------------------------------------------------------
 
-  private flyTo(target: THREE.Vector3, distance: number, polar: number, azimuth: number, animate = true) {
-    const d = THREE.MathUtils.clamp(distance, MIN_DISTANCE, MAX_DISTANCE);
-    const p = THREE.MathUtils.clamp(polar, MIN_POLAR, MAX_POLAR);
-    const toPos = new THREE.Vector3(
-      target.x + d * Math.sin(p) * Math.sin(azimuth),
-      d * Math.cos(p),
-      target.z + d * Math.sin(p) * Math.cos(azimuth),
+  private applyView() {
+    const v = this.view;
+    v.dist = THREE.MathUtils.clamp(v.dist, MIN_DISTANCE, MAX_DISTANCE);
+    v.polar = THREE.MathUtils.clamp(v.polar, MIN_POLAR, MAX_POLAR);
+    // Keep the view from being dragged away from the Haram area.
+    const d = Math.hypot(v.target.x, v.target.z);
+    if (d > 700) {
+      v.target.x *= 700 / d;
+      v.target.z *= 700 / d;
+    }
+    v.target.y = 0;
+    this.camera.position.set(
+      v.target.x + v.dist * Math.sin(v.polar) * Math.sin(v.azimuth),
+      v.dist * Math.cos(v.polar),
+      v.target.z + v.dist * Math.sin(v.polar) * Math.cos(v.azimuth),
     );
+    this.camera.lookAt(v.target);
+    this.camera.updateMatrixWorld();
+    this.needsRender = true;
+  }
+
+  /** The point on the ground under a screen position (CSS pixels in the canvas). */
+  private groundAt(x: number, y: number) {
+    const w = this.canvas.clientWidth;
+    const h = this.canvas.clientHeight;
+    this.ray.setFromCamera(new THREE.Vector2((x / w) * 2 - 1, -(y / h) * 2 + 1), this.camera);
+    return this.ray.ray.intersectPlane(this.ground, new THREE.Vector3());
+  }
+
+  /** Apply a change, then slide the map so the point under the fingers stays under them. */
+  private gesture(from: [number, number], to: [number, number], zoom: number, twist: number) {
+    const before = this.groundAt(from[0], from[1]);
+    this.view.dist /= zoom;
+    this.view.azimuth += twist;
+    this.applyView();
+    const after = this.groundAt(to[0], to[1]);
+    if (before && after) {
+      this.view.target.add(before).sub(after);
+      this.applyView();
+    }
+  }
+
+  private bindGestures() {
+    const c = this.canvas;
+    const local = (e: PointerEvent | WheelEvent | MouseEvent): [number, number] => {
+      const r = c.getBoundingClientRect();
+      return [e.clientX - r.left, e.clientY - r.top];
+    };
+    c.addEventListener('pointerdown', (e) => {
+      this.flight = null;
+      try {
+        c.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture is only a convenience */
+      }
+      this.pointers.set(e.pointerId, local(e));
+      this.lastGesture = null;
+    });
+    c.addEventListener('pointermove', (e) => {
+      const prev = this.pointers.get(e.pointerId);
+      if (!prev) return;
+      const now = local(e);
+      this.pointers.set(e.pointerId, now);
+      if (this.pointers.size === 1) {
+        if (e.pointerType === 'mouse' && (e.shiftKey || e.buttons & 2)) {
+          this.view.azimuth -= (now[0] - prev[0]) * 0.008;
+          this.view.polar -= (now[1] - prev[1]) * 0.006;
+          this.applyView();
+        } else {
+          this.gesture(prev, now, 1, 0);
+        }
+      } else if (this.pointers.size === 2) {
+        const [a, b] = [...this.pointers.values()];
+        const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        const dist = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
+        const last = this.lastGesture;
+        if (last && last.dist > 0) {
+          let twist = angle - last.angle;
+          if (twist > Math.PI) twist -= Math.PI * 2;
+          if (twist < -Math.PI) twist += Math.PI * 2;
+          this.gesture(last.mid, mid, dist / last.dist, twist);
+        }
+        this.lastGesture = { mid, dist, angle };
+      }
+    });
+    const end = (e: PointerEvent) => {
+      this.pointers.delete(e.pointerId);
+      this.lastGesture = null;
+    };
+    c.addEventListener('pointerup', end);
+    c.addEventListener('pointercancel', end);
+    c.addEventListener('contextmenu', (e) => e.preventDefault());
+    c.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        this.flight = null;
+        const p = local(e);
+        this.gesture(p, p, Math.exp(-e.deltaY * 0.0018), 0);
+      },
+      { passive: false },
+    );
+    c.addEventListener('dblclick', (e) => {
+      const p = local(e);
+      this.gesture(p, p, 2, 0);
+    });
+  }
+
+  private flyTo(target: THREE.Vector3, distance: number, polar: number, azimuth: number, animate = true) {
+    const to = {
+      target: target.clone(),
+      dist: THREE.MathUtils.clamp(distance, MIN_DISTANCE, MAX_DISTANCE),
+      polar: THREE.MathUtils.clamp(polar, MIN_POLAR, MAX_POLAR),
+      azimuth,
+    };
     if (!animate || this.reducedMotion) {
       this.flight = null;
-      this.camera.position.copy(toPos);
-      this.controls.target.copy(target);
-      this.controls.update();
-      this.needsRender = true;
+      Object.assign(this.view, { ...to, target: to.target });
+      this.applyView();
       return;
     }
-    this.flight = {
-      fromPos: this.camera.position.clone(),
-      toPos,
-      fromTarget: this.controls.target.clone(),
-      toTarget: target.clone(),
-      t: 0,
-    };
+    this.flight = { from: { ...this.view, target: this.view.target.clone() }, to, t: 0 };
   }
 
   private distance() {
-    return this.camera.position.distanceTo(this.controls.target);
+    return this.view.dist;
   }
 
   /** The default aerial view: north up, every step pin in frame. */
@@ -417,21 +504,21 @@ export class CityScene {
 
   /** Move in on one point, keeping the current compass direction. */
   focus(pos: [number, number]) {
-    this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), 720, 0.75, this.controls.getAzimuthalAngle());
+    this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), 720, 0.75, this.view.azimuth);
   }
 
   zoomBy(factor: number) {
-    this.flyTo(this.controls.target.clone(), this.distance() * factor, this.controls.getPolarAngle(), this.controls.getAzimuthalAngle());
+    this.flyTo(this.view.target.clone(), this.distance() * factor, this.view.polar, this.view.azimuth);
   }
 
   rotateBy(radians: number) {
-    this.flyTo(this.controls.target.clone(), this.distance(), this.controls.getPolarAngle(), this.controls.getAzimuthalAngle() + radians);
+    this.flyTo(this.view.target.clone(), this.distance(), this.view.polar, this.view.azimuth + radians);
   }
 
   /** Switch between looking straight down and a tilted 3D view. Returns true if now tilted. */
   toggleTilt() {
-    const tilted = this.controls.getPolarAngle() > 0.6;
-    this.flyTo(this.controls.target.clone(), this.distance(), tilted ? MIN_POLAR : TILTED_POLAR, this.controls.getAzimuthalAngle());
+    const tilted = this.view.polar > 0.6;
+    this.flyTo(this.view.target.clone(), this.distance(), tilted ? MIN_POLAR : TILTED_POLAR, this.view.azimuth);
     return !tilted;
   }
 
@@ -475,12 +562,13 @@ export class CityScene {
       const f = this.flight;
       f.t = Math.min(1, f.t + dt / 0.6);
       const e = 1 - Math.pow(1 - f.t, 3);
-      this.camera.position.lerpVectors(f.fromPos, f.toPos, e);
-      this.controls.target.lerpVectors(f.fromTarget, f.toTarget, e);
+      this.view.target.lerpVectors(f.from.target, f.to.target, e);
+      this.view.dist = THREE.MathUtils.lerp(f.from.dist, f.to.dist, e);
+      this.view.polar = THREE.MathUtils.lerp(f.from.polar, f.to.polar, e);
+      this.view.azimuth = THREE.MathUtils.lerp(f.from.azimuth, f.to.azimuth, e);
+      this.applyView();
       if (f.t >= 1) this.flight = null;
-      this.needsRender = true;
     }
-    this.controls.update();
     if (this.needsRender) {
       if (this.composer) this.composer.render();
       else this.renderer.render(this.scene, this.camera);
@@ -492,7 +580,6 @@ export class CityScene {
   dispose() {
     cancelAnimationFrame(this.raf);
     this.resizeObserver.disconnect();
-    this.controls.dispose();
     this.scene.traverse((o) => {
       if (o instanceof THREE.Mesh) o.geometry.dispose();
     });

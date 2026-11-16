@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MIQATS } from './data/miqats';
-import { CityScene, IS_DEMO_HOTELS, type Look, type Pin } from './scene/CityScene';
+import { CityScene, type Look, type Pin } from './scene/CityScene';
 import {
   CLAY,
   CLAY_CYAN,
@@ -11,7 +11,6 @@ import {
   CLAY_GREEN,
   CLAY_MODEL,
   CLAY_PLAIN_GREY,
-  HOLOGRAM,
 } from './themes';
 import { MARWA, SAFA, STEPS } from './data/steps';
 import { MOSQUES, PLACES as SITES, type Place } from './data/places';
@@ -67,16 +66,15 @@ const THEMES = {
   'cyan-grey': CLAY_CYAN_GREY,
   'clay-grey': CLAY_PLAIN_GREY,
   day: CLAY_DAY,
-  hologram: HOLOGRAM,
 } as const;
 const LOOK_KEY = (LOOK_PARAM in THEMES ? LOOK_PARAM : 'plain') as keyof typeof THEMES;
 // Every cyan option and the green look use the 'cyan' scene setup (lighting, drawn windows).
 const LOOK: Look =
-  LOOK_KEY.startsWith('cyan') || LOOK_KEY === 'green' || LOOK_KEY === 'day' ? 'cyan' : LOOK_KEY === 'hologram' ? 'hologram' : LOOK_KEY === 'clay-grey' ? 'plain' : (LOOK_KEY as Look);
+  LOOK_KEY.startsWith('cyan') || LOOK_KEY === 'green' || LOOK_KEY === 'day' ? 'cyan' : LOOK_KEY === 'clay-grey' ? 'plain' : (LOOK_KEY as Look);
 const SCENE_THEME = THEMES[LOOK_KEY];
 // Option A (cyan-light), green, cyan-grey and clay-grey are drawn on real OpenStreetMap data; the other looks
 // keep the illustrative city so they can still be compared.
-const REAL_CITY = ['cyan-light', 'green', 'cyan-grey', 'clay-grey', 'day', 'hologram'].includes(LOOK_KEY);
+const REAL_CITY = ['cyan-light', 'green', 'cyan-grey', 'clay-grey', 'day'].includes(LOOK_KEY);
 
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);
@@ -350,11 +348,7 @@ export function App() {
         )}
 
         <p className="notice">
-          {IS_DEMO_HOTELS && LOOK_KEY === 'hologram'
-            ? 'Demo: orange buildings are random, not real hotels. Map © OpenStreetMap.'
-            : LOOK_KEY === 'hologram'
-              ? 'Hotels in orange are not shown yet: the hotel data is not downloaded. Map © OpenStreetMap.'
-              : city
+          {city
             ? 'Map © OpenStreetMap. Some heights estimated.'
             : LOOK !== 'plain'
               ? 'Illustrative hills and buildings, not real map data.'

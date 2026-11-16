@@ -28,11 +28,6 @@ export interface SceneTheme {
   sea?: number;
   /** Regional map: the railway. Defaults to the road colour. */
   rail?: number;
-  /** Hologram look: line colour of ordinary buildings, of hotels, and of the mosque. */
-  edge?: number;
-  hotelEdge?: number;
-  haramEdge?: number;
-  holoFloor?: number;
 }
 
 export const CLAY: SceneTheme = {
@@ -163,32 +158,4 @@ export const CLAY_DAY: SceneTheme = {
   // Not in the owner's Day scheme yet; the closest neutrals from it, pending the owner's choice:
   sea: 0xe6ecef, // page background
   rail: 0x6b7c99, // pin outline
-};
-
-/**
- * Hologram look: see-through blue buildings with glowing edges on a near-black
- * ground, hotels in orange. Not part of the owner's Day scheme (it has cyan and
- * orange and a dark ground), so it is a comparison look until approved.
- */
-export const HOLOGRAM: SceneTheme = {
-  ...CLAY_DAY,
-  background: 0x040913,
-  ground: 0x060d1b,
-  slab: 0x0a1628,
-  road: 0x12263f,
-  sea: 0x030710,
-  rail: 0x2a4a73,
-  skyGround: 0x060d1b,
-  sky: 0x1a2c4d,
-  skyIntensity: 1.1,
-  building: 0x1f8fe0, // fill colour
-  edge: 0x4fc8ff,
-  hotelEdge: 0xff8a2a,
-  haram: 0x1f9aa8,
-  haramEdge: 0x6fe8dc,
-  holoFloor: 0x0b1f2e,
-  kaabah: 0xe9eef5,
-  node: 0xdcecff,
-  sunIntensity: 1.4,
-  shadowStrength: 0,
 };

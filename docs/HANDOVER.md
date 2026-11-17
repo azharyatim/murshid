@@ -194,7 +194,8 @@ Adopted from branch `claude/hopeful-heisenberg-a1p880` (not merged; reference co
 - **Zoom distances** (camera to city centre), scaled 1.2x from the branch because the real buildings cover about 1.8 km: ground patch fades in 84 to 26 km, footprints 36 to 11 km, buildings rise 3.5 to 1.45 km. Pins fade inside their ranges so sets hand over without overlapping.
 - **Colours:** the owner's (exact) for ground layers 1 to 3 and all objects. Placeholders (not chosen by the owner): ground layers 4 to 8 `#EEC98E #F0B47B #E49469 #DC8669 #EECCBA`, water and map background `#2F7A7C`. Green Dome `#62A69A` is not used yet.
 - **Stage A only:** Makkah rises; Madinah has its ground patch but no 3D buildings. Stage B: Madinah, jump buttons, zoom indicator, performance.
-- **Known limits:** the terrain covers 39 to 41 E only, so Badr (38.8 E) sits on the water colour; the region ground is 145 m per cell (stepped look between about 5 and 30 km); frame rate not measured on a real phone.
+- **Owner's decisions (17 Nov 2026):** keep the homes colour for now; the colour key is a Key button, closed by default; elevation widened to 38 to 41 E (re-baked, 12 Copernicus tiles) so Badr and its coast are on land.
+- **Known limits:** the region ground is 145 m per cell (stepped look between about 5 and 30 km); frame rate not measured on a real phone.
 
 ## Later feature ideas from the owner (not scheduled)
 

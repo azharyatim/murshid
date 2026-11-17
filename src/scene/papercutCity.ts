@@ -36,10 +36,10 @@ export const KIND_COLOUR: Record<Kind | 'kaabah' | 'dome' | 'node', number> = {
  * dome, keep the first palette because no colour was chosen for them.
  */
 export const CUSTOM_KIND_COLOUR: Partial<typeof KIND_COLOUR> = {
-  hotel: 0xb7cd9b,
+  hotel: 0xe49468,
   shop: 0xefc086,
   home: 0xf7efe2,
-  mosque: 0xe49468,
+  mosque: 0xb7cd9b,
   tower: 0x60998a,
   kaabah: 0x26324d,
   node: 0x623c00,

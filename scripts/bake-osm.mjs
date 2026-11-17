@@ -23,6 +23,7 @@ const CITIES = {
     origin: { type: 'way', id: 103914569, note: 'centre of the Kaabah footprint' }, // the Kaabah
     kaabah: true,
     mosque: [{ type: 'relation', id: 1472531 }], // Masjid al-Haram
+    towers: { type: 'relation', id: 12896421 }, // Abraj al-Bait (the Clock Towers), for a map label
   },
   'madinah-nabawi': {
     origin: { type: 'way', id: 461699097, note: "centre of the Prophet's Mosque footprint" },
@@ -157,7 +158,7 @@ for (const e of els) {
   const kind = isMosque(e) || special || minaret ? 'haram' : t.building === 'roof' ? 'roof' : 'building';
   for (const o of outer) {
     // `simple`: kept as plain massing even if detailed parts exist inside it.
-    footprints.push({ kind, h, est, min: minHeightOf(t), outer: o, holes: inner.filter((r) => inside(r[0], o)), simple: special });
+    footprints.push({ kind, h, est, min: minHeightOf(t), outer: o, holes: inner.filter((r) => inside(r[0], o)), simple: special, tags: t });
   }
 }
 
@@ -184,6 +185,8 @@ if (existsSync(partsFile)) {
         kind: inHaram ? 'haram' : 'building',
         h,
         est,
+        // A part's own tags, falling back to its building's (for "is it a hotel?").
+        tags: { ...(host?.tags ?? {}), ...t },
         min: minHeightOf(t),
         outer: o,
         holes: inner.filter((r) => inside(r[0], o)),
@@ -192,11 +195,28 @@ if (existsSync(partsFile)) {
   }
 }
 
+// Building type, for the Papercut look's colours: t = tower, h = hotel, s = shop,
+// o = home. From OpenStreetMap tags where they say so; otherwise a GUESS from
+// height and distance to the mosque (marked g: 1).
+const SHOP_BUILDINGS = ['commercial', 'retail', 'kiosk', 'supermarket', 'mall'];
+function typeOf(f) {
+  const t = f.tags ?? {};
+  if (f.h >= 120) return { c: 't' };
+  if (t.tourism === 'hotel' || t.building === 'hotel' || t['building:part'] === 'hotel') return { c: 'h' };
+  if (t.shop || SHOP_BUILDINGS.includes(t.building) || t.amenity === 'marketplace') return { c: 's' };
+  if (t.building === 'house' || t.building === 'residential' || t.building === 'apartments') return { c: 'o' };
+  // Guesses: tall or dense means hotel; low near the mosque means shops; the rest homes.
+  if (f.h >= 30) return { c: 'h', g: 1 };
+  const c0 = centre(f.outer.slice(0, -1));
+  return { c: Math.hypot(...toXZ(c0)) < 400 ? 's' : 'o', g: 1 };
+}
+
 const buildings = [];
 let estimated = 0;
 for (const f of [...footprints.filter((f) => !f.replaced && !f.hidden), ...parts]) {
   if (f.h <= f.min) continue;
   const b = { kind: f.kind, h: r1(f.h), rings: [flat(f.outer), ...f.holes.map(flat)] };
+  if (f.kind !== 'haram') Object.assign(b, typeOf(f));
   if (f.min > 0) b.min = r1(f.min);
   if (f.est) {
     b.est = 1;
@@ -234,6 +254,11 @@ const haramRel = kaabah && els.find((e) => e.type === 'relation' && isMosque(e))
 const matafRing = haramRel && assemble(haramRel.members.filter((m) => m.role === 'inner' && m.geometry).map((m) => m.geometry))[0];
 if (matafRing) landmarks.mataf = flat(matafRing);
 if (maqam) landmarks.maqam = centroid(maqam.geometry);
+if (city.towers) {
+  const rel = els.find((e) => e.type === city.towers.type && e.id === city.towers.id);
+  const pts = rel ? ringsOf(rel).outer.flatMap((r) => r.slice(0, -1)) : [];
+  if (pts.length) landmarks.towers = centroid([...pts, pts[0]]);
+}
 if (masa) {
   const pts = masa.geometry.map(toXZ);
   landmarks.safa = pts.reduce((a, b) => (b[1] > a[1] ? b : a));

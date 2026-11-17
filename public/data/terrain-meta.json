@@ -1,0 +1,38 @@
+{
+ "source": "Copernicus DEM GLO-30 (ESA / DLR / Airbus). Contains modified Copernicus data.",
+ "baked": "2026-11-17T09:37:26.031Z",
+ "layers": 12,
+ "layer0": 4,
+ "edgesMetres": [
+  0,
+  120,
+  200,
+  300,
+  420,
+  560,
+  740,
+  980
+ ],
+ "region": {
+  "x": -84660.8226940975,
+  "z": -398961.1001610791,
+  "w": 204940.26311812515,
+  "h": 445401.0349342928,
+  "nx": 1408,
+  "nz": 3072
+ },
+ "makkah": {
+  "x": 0,
+  "z": 0,
+  "half": 4000,
+  "n": 320,
+  "centreElevation": 294
+ },
+ "madinah": {
+  "x": -22041.32529835432,
+  "z": -338850.35247555556,
+  "half": 4000,
+  "n": 320,
+  "centreElevation": 608
+ }
+}

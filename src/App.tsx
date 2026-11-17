@@ -9,8 +9,10 @@ import {
   CLAY_DAY,
   CLAY_GREEN,
   CLAY_MODEL,
+  CLAY_PAPERCUT,
   CLAY_PLAIN_GREY,
 } from './themes';
+import { PAPER_OWNER, PAPER_STAGES } from './scene/papercut';
 import { MARWA, SAFA, STEPS } from './data/steps';
 import { MOSQUES, PLACES as SITES, type Place } from './data/places';
 import { loadCity, loadRegion, type CityData, type RegionData } from './scene/realCity';
@@ -29,11 +31,26 @@ const PLACES: { name: string; pos: [number, number] }[] = [
 
 // With the regional map, which pins show depends on how far out the view is (metres).
 const CITY_VIEW = 60_000; // further out than this: only city names (and Badr)
-const STREET_VIEW = 8_000; // closer than this: the Umrah step pins and Haram labels
+
+/** Papercut: the legend's colours (the owner's). */
+const PAPER_LEGEND = [
+  { name: 'Hotels', colour: PAPER_OWNER.hotel },
+  { name: 'Shops', colour: PAPER_OWNER.shop },
+  { name: 'Homes', colour: PAPER_OWNER.home },
+  { name: 'Mosque', colour: PAPER_OWNER.mosque },
+  { name: 'Towers', colour: PAPER_OWNER.tower },
+];
 const CITY_LABELS = [
   { name: 'Makkah', placeId: 'haram' },
   { name: 'Madinah', placeId: 'nabawi' },
 ];
+
+/** Papercut: extra landmark labels, from the map data. */
+function paperLandmarks(c: CityData): { name: string; pos: [number, number] }[] {
+  const list: { name: string; pos: [number, number] }[] = [{ name: 'Kaabah', pos: [0, 0] }];
+  if (c.landmarks.towers) list.push({ name: 'Abraj al-Bait (Clock Towers)', pos: c.landmarks.towers });
+  return list;
+}
 
 /** How far to stand back when a place is chosen (metres). */
 function focusDistance(p: Place) {
@@ -65,21 +82,27 @@ const THEMES = {
   'cyan-grey': CLAY_CYAN_GREY,
   'clay-grey': CLAY_PLAIN_GREY,
   day: CLAY_DAY,
+  papercut: CLAY_PAPERCUT,
 } as const;
 const LOOK_KEY = (LOOK_PARAM in THEMES ? LOOK_PARAM : 'plain') as keyof typeof THEMES;
 // Every cyan option and the green look use the 'cyan' scene setup (lighting, drawn windows).
 const LOOK: Look =
   LOOK_KEY.startsWith('cyan') || LOOK_KEY === 'green' || LOOK_KEY === 'day' ? 'cyan' : LOOK_KEY === 'clay-grey' ? 'plain' : (LOOK_KEY as Look);
+// ?look=papercut: a contour map of real elevation that turns into 3D buildings on zoom.
+const PAPER = LOOK === 'papercut';
+// Closer than this: the Umrah step pins and Haram labels. Papercut shows them as the buildings rise.
+const STREET_VIEW = PAPER ? PAPER_STAGES.growStart : 8_000;
 const SCENE_THEME = THEMES[LOOK_KEY];
 // Option A (cyan-light), green, cyan-grey and clay-grey are drawn on real OpenStreetMap data; the other looks
 // keep the illustrative city so they can still be compared.
-const REAL_CITY = ['cyan-light', 'green', 'cyan-grey', 'clay-grey', 'day'].includes(LOOK_KEY);
+const REAL_CITY = ['cyan-light', 'green', 'cyan-grey', 'clay-grey', 'day', 'papercut'].includes(LOOK_KEY);
 
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);
   const [placeId, setPlaceId] = useState<string | null>(null);
   const [tilted, setTilted] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const legendRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<CityScene | null>(null);
   const pinEls = useRef(new Map<string, HTMLElement>());
 
@@ -117,6 +140,10 @@ export function App() {
     const street = regionNow ? { maxDist: STREET_VIEW } : {};
     MAP_STEPS.forEach((s) => pins.push({ el: pinEls.current.get(`step-${s.n}`)!, pos: toScene(s.pos!), ...street }));
     PLACES.forEach((p) => pins.push({ el: pinEls.current.get(`place-${p.name}`)!, pos: toScene(p.pos), ...street }));
+    if (PAPER && regionNow && city) {
+      paperLandmarks(city).forEach((l) => pins.push({ el: pinEls.current.get(`place-${l.name}`)!, pos: toScene(l.pos), ...street }));
+      scene.setLegend(legendRef.current);
+    }
     if (regionNow) {
       SITES.forEach((p) => {
         // Badr stays visible from far out; the others appear once a city fills the view.
@@ -217,6 +244,13 @@ export function App() {
         />
 
         <div className="pins">
+          {PAPER &&
+            city &&
+            paperLandmarks(city).map((l) => (
+              <span key={l.name} ref={setPinEl(`place-${l.name}`)} className="place">
+                <span>{l.name}</span>
+              </span>
+            ))}
           {PLACES.map((p) => (
             <span key={p.name} ref={setPinEl(`place-${p.name}`)} className="place">
               <span>{p.name}</span>
@@ -300,8 +334,21 @@ export function App() {
           </button>
         </div>
 
+        {PAPER && (
+          <div ref={legendRef} className="paper-legend" aria-label="Building colours" style={{ visibility: 'hidden' }}>
+            {PAPER_LEGEND.map((l) => (
+              <span key={l.name}>
+                <i style={{ background: l.colour }} aria-hidden="true" />
+                {l.name}
+              </span>
+            ))}
+          </div>
+        )}
+
         <p className="notice">
-          {city
+          {city && PAPER
+            ? 'Elevation: modified Copernicus data. Buildings © OpenStreetMap.'
+            : city
             ? 'Map © OpenStreetMap. Some heights estimated.'
             : LOOK !== 'plain'
               ? 'Illustrative hills and buildings, not real map data.'

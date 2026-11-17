@@ -184,6 +184,18 @@ The owner reviews on their phone through a private Claude page: https://claude.a
 - **Place list merged** with the owner's own list (13 Nov 2026), which added Taif (Masjid Abdullah ibn Abbas, rose farms and factory), Badr, a date farm, Jabal al-Rumah and al-Hudaybiyah. The opening map shows Makkah and Madinah only; Taif and Badr are reached by zooming or dragging. Place names show the standard English spelling with the owner's spelling in brackets, e.g. "Jabal Thawr (Jabal Tsur)".
 - The Madinah 3D core needs the same two OpenStreetMap downloads as Makkah (buildings and roads, then building parts), centred on the Prophet's Mosque.
 
+## Papercut look (?look=papercut), Stage A built 17 Nov 2026
+
+Adopted from branch `claude/hopeful-heisenberg-a1p880` (not merged; reference code only), adapted to this prototype. Opens on a contour map in layered paper and turns into 3D buildings as you zoom into Makkah. Behind `?look=papercut`; every other look and the default are unchanged. A separate private preview page shows it (see "Private preview page").
+
+- **Real:** the ground (Copernicus DEM GLO-30, 30 m, baked on that branch by `scripts/bake-terrain.mjs` into `public/data/terrain-*.bin`; attribution "Contains modified Copernicus data", shown on the map) and the buildings (this prototype's OpenStreetMap footprints and heights, not the branch's generated stand-ins). Clock Towers label position: from the OSM relation.
+- **Guessed:** building type for colour. Tagged hotels, shops and homes use their tags; anything 120 m or taller is a tower; untagged buildings are a guess (30 m or taller: hotel; lower and within 400 m of the Haram: shop; otherwise home), marked `g: 1` in `public/data/*.json`.
+- **Code:** `src/scene/papercut.ts` (colours, zoom distances, paper painter that converts the branch's Mercator terrain into this scene's projection), `setupPaper` / `updatePaper` in `src/scene/CityScene.ts`, `paperBuildingGeometry` in `realCity.ts`, legend and landmark labels in `App.tsx`.
+- **Zoom distances** (camera to city centre), scaled 1.2x from the branch because the real buildings cover about 1.8 km: ground patch fades in 84 to 26 km, footprints 36 to 11 km, buildings rise 3.5 to 1.45 km. Pins fade inside their ranges so sets hand over without overlapping.
+- **Colours:** the owner's (exact) for ground layers 1 to 3 and all objects. Placeholders (not chosen by the owner): ground layers 4 to 8 `#EEC98E #F0B47B #E49469 #DC8669 #EECCBA`, water and map background `#2F7A7C`. Green Dome `#62A69A` is not used yet.
+- **Stage A only:** Makkah rises; Madinah has its ground patch but no 3D buildings. Stage B: Madinah, jump buttons, zoom indicator, performance.
+- **Known limits:** the terrain covers 39 to 41 E only, so Badr (38.8 E) sits on the water colour; the region ground is 145 m per cell (stepped look between about 5 and 30 km); frame rate not measured on a real phone.
+
 ## Later feature ideas from the owner (not scheduled)
 
 - **Hotels.** Colour hotels differently, and let a pilgrim find their own hotel and see the walking route to the Haram. In the current export 158 of 413 outlines are tagged as hotels (127 named); unmarked buildings may be hotels too, so this must be labelled as incomplete.

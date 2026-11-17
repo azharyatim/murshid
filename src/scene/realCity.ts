@@ -13,13 +13,25 @@ export interface CityData {
   landmarks: {
     /** Only in Makkah. */
     kaabah?: number[];
+    /** Centre of Abraj al-Bait (the Clock Towers), Makkah only. */
+    towers?: [number, number];
     kaabahHeight?: number;
     mataf?: number[];
     maqam?: [number, number];
     safa?: [number, number];
     marwa?: [number, number];
   };
-  buildings: { kind: 'building' | 'haram' | 'roof'; h: number; min?: number; est?: 1; rings: number[][] }[];
+  buildings: {
+    kind: 'building' | 'haram' | 'roof';
+    h: number;
+    min?: number;
+    est?: 1;
+    rings: number[][];
+    /** Type for the Papercut colours: t tower, h hotel, s shop, o home. */
+    c?: 't' | 'h' | 's' | 'o';
+    /** 1 when the type is a guess from height and position, not from map tags. */
+    g?: 1;
+  }[];
   roads: { w: number; pts: number[] }[];
 }
 
@@ -54,6 +66,24 @@ function extrude(rings: number[][], height: number, base = 0, baseShade?: number
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   }
   return geo;
+}
+
+/**
+ * Papercut look: every building and the mosque in one mesh, each building one
+ * flat colour (no shading gradient), chosen by `colourOf`.
+ */
+export function paperBuildingGeometry(data: CityData, colourOf: (b: CityData['buildings'][number]) => string) {
+  const col = new THREE.Color();
+  const parts = data.buildings.map((b) => {
+    const geo = extrude(b.rings, b.h, b.min ?? 0);
+    col.set(colourOf(b));
+    const n = geo.attributes.position.count;
+    const colors = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) colors.set([col.r, col.g, col.b], i * 3);
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    return geo;
+  });
+  return parts.length ? mergeGeometries(parts) : null;
 }
 
 export function buildingGeometry(data: CityData, kinds: string[], baseShade?: number) {

@@ -159,3 +159,22 @@ export const CLAY_DAY: SceneTheme = {
   sea: 0xe6ecef, // page background
   rail: 0x6b7c99, // pin outline
 };
+
+/**
+ * Papercut (?look=papercut). Most colours come from src/scene/papercut.ts (the
+ * owner's colours plus labelled placeholders). Here: the map background (water,
+ * a PLACEHOLDER), the Kaabah and nodes (the owner's), and lighting chosen so
+ * flat building colours read close to the palette (values from the Papercut build).
+ */
+export const CLAY_PAPERCUT: SceneTheme = {
+  ...CLAY_DAY,
+  background: 0x2f7a7c,
+  kaabah: 0x26324d,
+  node: 0x623c00,
+  sun: 0xffffff,
+  sunIntensity: 1.57,
+  sky: 0xffffff,
+  skyGround: 0xd8c9a8,
+  skyIntensity: 1.95,
+  shadowStrength: 1,
+};

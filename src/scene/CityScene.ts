@@ -14,19 +14,46 @@ import {
   kaabahGeometry,
   matafClearance,
   matafGeometry,
+  paperBuildingGeometry,
   polylineGeometry,
   roadGeometry,
   type CityData,
   type RegionData,
 } from './realCity';
 import { regionXZ } from './projection';
+import {
+  PAPER_OWNER,
+  PAPER_PLACEHOLDER,
+  PAPER_STAGES,
+  PAPER_TYPE_COLOUR,
+  paintPaper,
+  smoothstep,
+  TERRAIN_REGION_LATLON,
+  worldRect,
+  type TerrainGrid,
+} from './papercut';
 
 /**
  * 'plain' is the flat placeholder grid with simple lighting.
  * 'model' adds hills, an irregular city, warm light with cool shadows and
  * ambient occlusion, to read like a physical clay site model.
  */
-export type Look = 'plain' | 'model' | 'cyan';
+export type Look = 'plain' | 'model' | 'cyan' | 'papercut';
+
+/** One city in the Papercut look: its sharper ground patch, shadow plane and rising buildings. */
+interface PaperCity {
+  /** Where its centre is, in scene metres. */
+  centre: THREE.Vector3;
+  /** Which baked terrain patch belongs to it. */
+  terrainKey: 'makkah' | 'madinah';
+  /** Null for a city that has no 3D buildings yet (Madinah, until stage B). */
+  grow: THREE.Group | null;
+  buildingMat: THREE.MeshLambertMaterial | null;
+  patch: THREE.Mesh;
+  patchMat: THREE.MeshBasicMaterial;
+  shadowPlane: THREE.Mesh;
+  painted: boolean;
+}
 
 /**
  * Draws rows of windows on building walls inside the material's shader.
@@ -149,6 +176,19 @@ export class CityScene {
   private makkah = new THREE.Group();
   private region: RegionData | null = null;
   private sunOffset = new THREE.Vector3(-520, 720, 380);
+  /** The Papercut look (?look=papercut). Null for every other look. */
+  private paper: {
+    cities: PaperCity[];
+    meta: { region: TerrainGrid; makkah: { x: number; z: number; half: number; n: number }; madinah: { x: number; z: number; half: number; n: number } } | null;
+    texSize: number;
+    /** 0..1: how far the nearest city's buildings have risen. */
+    growth: number;
+    /** 0..1: how far the nearest city's footprints have faded in. */
+    foot: number;
+    nearest: number;
+    nodeScale: number;
+    legend: HTMLElement | null;
+  } | null = null;
   /**
    * Flat layers lying on the ground (sea, streets, road lines), each lifted a
    * little more than the one below. The lift grows with viewing distance: far
@@ -194,13 +234,15 @@ export class CityScene {
     regional: { region: RegionData; madinah: CityData | null } | null = null,
   ) {
     this.reducedMotion = reducedMotion;
-    const model = look !== 'plain';
+    const paper = look === 'papercut' && Boolean(city && regional);
+    const model = look !== 'plain' && look !== 'papercut';
     const small = Math.min(window.innerWidth, window.innerHeight) < 700;
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Papercut is tuned for phones: pixel ratio capped at 1.75 there, 2 on larger screens.
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, paper && small ? 1.75 : 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = paper ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     if (model) {
       // Ambient occlusion darkens corners and the foot of each building.
       const target = new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType });
@@ -218,10 +260,11 @@ export class CityScene {
     this.sun.position.copy(this.sunOffset);
     this.sun.castShadow = true;
     this.scene.add(this.sun.target);
-    const size = model ? (small ? 2048 : 4096) : small ? 1024 : 2048;
+    // Papercut: a 1536 (phone) or 2048 shadow map covering only the active city.
+    const size = paper ? (small ? 1536 : 2048) : model ? (small ? 2048 : 4096) : small ? 1024 : 2048;
     this.sun.shadow.mapSize.set(size, size);
     const sc = this.sun.shadow.camera;
-    const reach = model ? 1700 : 1250;
+    const reach = paper ? 1100 : model ? 1700 : 1250;
     sc.left = -reach;
     sc.right = reach;
     sc.top = reach;
@@ -234,7 +277,11 @@ export class CityScene {
 
     this.scene.add(this.makkah);
     // Ground (roads and open space).
-    if (city) {
+    if (city && regional && paper) {
+      this.region = regional.region;
+      this.makkah.position.set(...this.cityOffset(city));
+      this.setupPaper(city, regional.madinah, small);
+    } else if (city) {
       this.mats.building.vertexColors = true;
       if (look === 'cyan') addWindows(this.mats.building);
       if (regional) {
@@ -282,7 +329,8 @@ export class CityScene {
       kaabah.rotation.y = 0.5;
     }
     kaabah.castShadow = true;
-    this.makkah.add(kaabah);
+    // Papercut: the Kaabah rises with the city's buildings.
+    (this.paper?.cities[0].grow ?? this.makkah).add(kaabah);
 
     // Travelling nodes circling the Kaabah anticlockwise.
     this.nodeMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1.7, 10, 8), this.mats.node, NODE_COUNT);
@@ -471,6 +519,180 @@ export class CityScene {
     return this.raycaster.ray.intersectPlane(this.groundPlane, new THREE.Vector3());
   }
 
+  // Papercut ------------------------------------------------------------------
+
+  /**
+   * The Papercut look: a contour map of real elevation in flat paper layers.
+   * Zooming in towards Makkah first fades in a sharper ground patch, then the
+   * real OpenStreetMap footprints as flat cut-outs, then raises them into 3D
+   * (3% to 100% height). See PAPER_STAGES for the distances.
+   */
+  private setupPaper(makkah: CityData, madinah: CityData | null, small: boolean) {
+    this.paper = { cities: [], meta: null, texSize: small ? 1536 : 2048, growth: 0, foot: 0, nearest: 0, nodeScale: -1, legend: null };
+    const make = (c: CityData, key: 'makkah' | 'madinah', root: THREE.Group, withBuildings: boolean) => {
+      const patchMat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: 0, toneMapped: false });
+      const patch = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000), patchMat);
+      patch.rotation.x = -Math.PI / 2;
+      patch.renderOrder = 1;
+      patch.visible = false;
+      root.add(patch);
+      this.flatLayers.push({ obj: patch, level: 1 });
+      // Shadow-only plane: the ground stays its exact colours, buildings still cast soft shadows.
+      const shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600), new THREE.ShadowMaterial({ opacity: 0 }));
+      shadowPlane.rotation.x = -Math.PI / 2;
+      shadowPlane.receiveShadow = true;
+      shadowPlane.renderOrder = 2;
+      shadowPlane.visible = false;
+      root.add(shadowPlane);
+      this.flatLayers.push({ obj: shadowPlane, level: 2 });
+      let grow: THREE.Group | null = null;
+      let buildingMat: THREE.MeshLambertMaterial | null = null;
+      if (withBuildings) {
+        grow = new THREE.Group();
+        grow.visible = false;
+        root.add(grow);
+        // One flat colour per building, by type; the mosque in the mosque colour.
+        buildingMat = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0 });
+        const geo = paperBuildingGeometry(c, (b) => (b.kind === 'haram' ? PAPER_OWNER.mosque : PAPER_TYPE_COLOUR[b.c ?? 'o']));
+        if (geo) {
+          const mesh = new THREE.Mesh(geo, buildingMat);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          grow.add(mesh);
+        }
+        const mataf = matafGeometry(c);
+        if (mataf) {
+          // The open Mataf floor takes the homes colour, as the owner chose.
+          const floor = new THREE.Mesh(mataf, new THREE.MeshLambertMaterial({ color: PAPER_OWNER.home }));
+          floor.receiveShadow = true;
+          grow.add(floor);
+        }
+      }
+      const centre = new THREE.Vector3(...this.cityOffset(c));
+      this.paper!.cities.push({ centre, terrainKey: key, grow, buildingMat, patch, patchMat, shadowPlane, painted: false });
+    };
+    make(makkah, 'makkah', this.makkah, true);
+    if (madinah) {
+      // Stage A: Madinah has its ground patch but no 3D buildings yet (stage B).
+      const g = new THREE.Group();
+      g.position.set(...this.cityOffset(madinah));
+      this.scene.add(g);
+      make(madinah, 'madinah', g, false);
+    }
+    // Let the first frame show before the heavy painting starts.
+    setTimeout(() => void this.loadPaperRegion(), 30);
+  }
+
+  private async loadPaperRegion() {
+    const p = this.paper!;
+    const url = (f: string) => `${import.meta.env.BASE_URL}data/${f}`;
+    try {
+      const [meta, buf] = await Promise.all([
+        fetch(url('terrain-meta.json')).then((r) => r.json()),
+        fetch(url('terrain-region.bin')).then((r) => r.arrayBuffer()),
+      ]);
+      p.meta = meta;
+      const rect = worldRect(TERRAIN_REGION_LATLON);
+      const max = this.renderer.capabilities.maxTextureSize;
+      const th = Math.min(meta.region.nz, max);
+      const tw = Math.min(max, Math.round((th * (rect.x1 - rect.x0)) / (rect.z1 - rect.z0)));
+      const cv = await paintPaper(new Uint8Array(buf), meta.region, rect, tw, th, 2, false);
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(rect.x1 - rect.x0, rect.z1 - rect.z0),
+        new THREE.MeshBasicMaterial({ map: this.paperTexture(cv), toneMapped: false }),
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set((rect.x0 + rect.x1) / 2, 0, (rect.z0 + rect.z1) / 2);
+      this.scene.add(mesh);
+      this.needsRender = true;
+    } catch (e) {
+      console.error('Could not load the terrain', e);
+    }
+  }
+
+  private paperTexture(cv: HTMLCanvasElement) {
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    // Free the painted image once the graphics card has its own copy.
+    tex.onUpdate = () => {
+      cv.width = cv.height = 1;
+      tex.onUpdate = () => {};
+    };
+    return tex;
+  }
+
+  /** Paints a city's sharper ground patch (25 m cells) the first time the camera gets near it. */
+  private async ensurePatch(c: PaperCity) {
+    const p = this.paper!;
+    if (c.painted || !p.meta) return;
+    c.painted = true;
+    const file = c.terrainKey === 'makkah' ? 'terrain-makkah.bin' : 'terrain-madinah.bin';
+    const buf = await fetch(`${import.meta.env.BASE_URL}data/${file}`).then((r) => r.arrayBuffer());
+    const m = p.meta[c.terrainKey];
+    const grid: TerrainGrid = { x: m.x - m.half, z: m.z - m.half, w: m.half * 2, h: m.half * 2, nx: m.n, nz: m.n };
+    const size = Math.min(p.texSize, this.renderer.capabilities.maxTextureSize);
+    const world = { x0: c.centre.x - 4000, x1: c.centre.x + 4000, z0: c.centre.z - 4000, z1: c.centre.z + 4000 };
+    const cv = await paintPaper(new Uint8Array(buf), grid, world, size, size, 5, true);
+    c.patchMat.map = this.paperTexture(cv);
+    c.patchMat.needsUpdate = true;
+    this.needsRender = true;
+  }
+
+  /** Works out each stage from the camera's distance to the cities. Smooth, never a hard switch. */
+  private updatePaper() {
+    const p = this.paper!;
+    const cam = this.camera.position;
+    const d = p.cities.map((c) => cam.distanceTo(c.centre));
+    const nearest = d.indexOf(Math.min(...d));
+    const S = PAPER_STAGES;
+    p.cities.forEach((c, i) => {
+      // Only the nearest city gets buildings; the other stays a map.
+      const g = i === nearest ? smoothstep(S.growStart, S.growEnd, d[i]) : 0;
+      const f = i === nearest ? smoothstep(S.footStart, S.footFull, d[i]) : 0;
+      if (c.grow && c.buildingMat) {
+        c.grow.visible = f > 0.01;
+        c.grow.scale.y = 0.03 + 0.97 * g;
+        c.buildingMat.opacity = f;
+        c.buildingMat.transparent = f < 0.999;
+        c.buildingMat.depthWrite = f > 0.5;
+      }
+      c.shadowPlane.visible = g > 0.02;
+      (c.shadowPlane.material as THREE.ShadowMaterial).opacity = 0.3 * g;
+      const pa = smoothstep(S.patchStart, S.patchFull, d[i]);
+      c.patchMat.opacity = c.patchMat.map ? pa : 0;
+      c.patch.visible = pa > 0.01 && Boolean(c.patchMat.map);
+      if (d[i] < S.patchStart * 1.2) void this.ensurePatch(c);
+      if (i === 0) {
+        p.growth = g;
+        p.foot = f;
+      }
+    });
+    p.nearest = nearest;
+    // The sun and its shadow map follow the nearest city only.
+    const act = p.cities[nearest].centre;
+    this.sun.target.position.copy(act);
+    this.sun.position.copy(act).add(this.sunOffset);
+    // Travelling nodes appear once Makkah's buildings are mostly up.
+    const ns = p.growth > 0.15 ? p.growth : 0;
+    this.nodeMesh.visible = ns > 0;
+    if (Math.abs(ns - p.nodeScale) > 0.002) {
+      p.nodeScale = ns;
+      this.needsRender = true;
+    }
+    if (p.legend) {
+      const a = Math.min(1, Math.max(0, p.growth * 2 - 0.5));
+      p.legend.style.opacity = a.toFixed(2);
+      p.legend.style.visibility = a > 0.04 ? 'visible' : 'hidden';
+    }
+  }
+
+  /** Papercut: the colour legend, shown as the buildings rise. */
+  setLegend(el: HTMLElement | null) {
+    if (this.paper) this.paper.legend = el;
+    this.needsRender = true;
+  }
+
   /** Where a city's local origin sits on the regional map. */
   private cityOffset(c: CityData): [number, number, number] {
     const [x, z] = regionXZ(c.origin.lat, c.origin.lon);
@@ -625,17 +847,22 @@ export class CityScene {
   }
 
   private placeNodes() {
+    // Papercut: nodes grow in with the buildings.
+    const scale = this.paper ? Math.max(0.001, this.paper.nodeScale) : 1;
     this.nodes.forEach((n, i) => {
       this.dummy.position.set(Math.cos(n.angle) * n.radius, 2.2, -Math.sin(n.angle) * n.radius);
+      this.dummy.scale.setScalar(scale);
       this.dummy.updateMatrix();
       this.nodeMesh.setMatrixAt(i, this.dummy.matrix);
     });
     this.nodeMesh.instanceMatrix.needsUpdate = true;
+    this.dummy.scale.setScalar(1);
   }
 
   setTheme(t: SceneTheme) {
     this.scene.background = new THREE.Color(t.background);
-    this.scene.fog = new THREE.Fog(t.background, 1900, 4200);
+    // Papercut keeps exact paper colours at every distance, so no fog.
+    this.scene.fog = this.paper ? null : new THREE.Fog(t.background, 1900, 4200);
     this.mats.ground.color.set(t.ground);
     this.mats.road.color.set(t.road ?? t.slab);
     this.mats.sea.color.set(t.sea ?? t.background);
@@ -663,7 +890,14 @@ export class CityScene {
   }
 
   setPins(pins: Pin[]) {
-    // Point each pin just above the top of whatever stands at its position.
+    // Point each pin just above the top of whatever stands at its position
+    // (Papercut: measured with the buildings at full height).
+    const grows = this.paper?.cities.map((c) => c.grow).filter((g): g is THREE.Group => !!g) ?? [];
+    const saved = grows.map((g) => [g.scale.y, g.visible] as const);
+    grows.forEach((g) => {
+      g.scale.y = 1;
+      g.visible = true;
+    });
     this.scene.updateMatrixWorld();
     for (const pin of pins) {
       this.raycaster.set(this.tmp.set(pin.pos[0], 3000, pin.pos[1]), new THREE.Vector3(0, -1, 0));
@@ -671,6 +905,11 @@ export class CityScene {
       const top = this.raycaster.intersectObjects(this.occluders, false)[0]?.point.y ?? 0;
       pin.y = Math.max(26, top + 3);
     }
+    grows.forEach((g, i) => {
+      g.scale.y = saved[i][0];
+      g.visible = saved[i][1];
+    });
+    this.scene.updateMatrixWorld();
     this.pins = pins;
     this.occlusionDirty = true;
     this.needsRender = true;
@@ -779,10 +1018,19 @@ export class CityScene {
     const h = this.canvas.clientHeight;
     const d = this.distance();
     for (const pin of this.pins) {
-      const inRange = d >= (pin.minDist ?? 0) && d <= (pin.maxDist ?? Infinity);
-      this.tmp.set(pin.pos[0], pin.y ?? 26, pin.pos[1]).project(this.camera);
-      const visible = inRange && this.tmp.z < 1 && Math.abs(this.tmp.x) < 1.2 && Math.abs(this.tmp.y) < 1.2;
+      // Papercut fades pins in and out over a band inside their range instead of
+      // switching them, so one set hands over to the next without overlapping.
+      const alpha = this.paper
+        ? (pin.maxDist ? smoothstep(pin.maxDist, pin.maxDist * 0.8, d) : 1) * (pin.minDist ? smoothstep(pin.minDist, pin.minDist * 1.25, d) : 1)
+        : d >= (pin.minDist ?? 0) && d <= (pin.maxDist ?? Infinity)
+          ? 1
+          : 0;
+      // A building that is still low cannot stand on a pin's full height.
+      const pinY = this.paper && pin.y ? Math.max(26, pin.y * (0.03 + 0.97 * this.paper.growth)) : (pin.y ?? 26);
+      this.tmp.set(pin.pos[0], pinY, pin.pos[1]).project(this.camera);
+      const visible = alpha > 0.04 && this.tmp.z < 1 && Math.abs(this.tmp.x) < 1.2 && Math.abs(this.tmp.y) < 1.2;
       pin.el.style.visibility = visible ? 'visible' : 'hidden';
+      if (this.paper) pin.el.style.opacity = alpha < 1 ? alpha.toFixed(2) : '';
       if (!visible) continue;
       const x = (this.tmp.x * 0.5 + 0.5) * w;
       const y = (-this.tmp.y * 0.5 + 0.5) * h;
@@ -824,6 +1072,7 @@ export class CityScene {
     }
     this.controls.update();
     if (this.region) this.fitToDistance();
+    if (this.paper) this.updatePaper();
     this.camera.updateMatrixWorld();
     if (!this.lastCamera.equals(this.camera.matrixWorld)) {
       this.lastCamera.copy(this.camera.matrixWorld);
@@ -863,6 +1112,7 @@ export class CityScene {
       this.scene.fog.far = d * 7;
     }
     for (const { obj, level } of this.flatLayers) obj.position.y = level * d * 0.0001;
+    if (this.paper) return; // Papercut: the sun follows the nearest city instead (updatePaper).
     // The sun's shadow area follows the view. Move it only in whole shadow-map
     // texels, seen from the sun, so shadow edges do not crawl while dragging.
     const sc = this.sun.shadow.camera;

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { CityScene, type Look, type Pin } from './scene/CityScene';
+import { CityScene, type Look as ClayLook, type Pin } from './scene/CityScene';
+import { PAPERCUT_LABELS, PapercutScene, type PaperStage } from './scene/PapercutScene';
+import { PapercutDock } from './PapercutDock';
 import { CLAY, CLAY_CYAN, CLAY_MODEL } from './themes';
 import { MARWA, SAFA, STEPS } from './data/steps';
 
@@ -13,30 +15,48 @@ const PLACES: { name: string; pos: [number, number] }[] = [
   { name: 'Marwa', pos: MARWA },
 ];
 
-// The plain look stays the default until the model look is approved.
-// Add ?look=model or ?look=cyan to the address to see the mockups.
-const LOOK_PARAM = new URLSearchParams(window.location.search).get('look');
-const LOOK: Look = LOOK_PARAM === 'model' || LOOK_PARAM === 'cyan' ? LOOK_PARAM : 'plain';
-const SCENE_THEME = { plain: CLAY, model: CLAY_MODEL, cyan: CLAY_CYAN }[LOOK];
+// The plain look stays the default until the owner picks one.
+// Add ?look=model, ?look=cyan or ?look=papercut to the address to see the others.
+// Papercut extras: ?fps shows the measured frame rate; ?quality=low starts at lower detail, ?quality=high never drops detail.
+const PARAMS = new URLSearchParams(window.location.search);
+const LOOK_PARAM = PARAMS.get('look');
+type Look = ClayLook | 'papercut';
+const LOOK: Look =
+  LOOK_PARAM === 'model' || LOOK_PARAM === 'cyan' || LOOK_PARAM === 'papercut' ? LOOK_PARAM : 'plain';
+const CLAY_THEMES = { plain: CLAY, model: CLAY_MODEL, cyan: CLAY_CYAN };
+const SHOW_FPS = PARAMS.has('fps');
+const QUALITY = PARAMS.get('quality') === 'low' ? 'low' : PARAMS.get('quality') === 'high' ? 'high' : 'auto';
+const INITIAL_STAGE: PaperStage = { loading: true, nearest: 0, zoom: 0, growth: 0, legend: 0, level: 'Loading map' };
 
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);
   const [tilted, setTilted] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const sceneRef = useRef<CityScene | null>(null);
+  const sceneRef = useRef<CityScene | PapercutScene | null>(null);
   const pinEls = useRef(new Map<string, HTMLElement>());
+  const [stage, setStage] = useState<PaperStage>(INITIAL_STAGE);
+  const [fps, setFps] = useState<{ fps: number; note: string } | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     const points = [...MAP_STEPS.map((s) => s.pos!), ...PLACES.map((p) => p.pos)];
-    const scene = new CityScene(canvas, SCENE_THEME, mq.matches, points, LOOK);
+    const scene =
+      LOOK === 'papercut'
+        ? new PapercutScene(canvas, mq.matches, QUALITY)
+        : new CityScene(canvas, CLAY_THEMES[LOOK], mq.matches, points, LOOK);
     const pins: Pin[] = [];
     MAP_STEPS.forEach((s) => pins.push({ el: pinEls.current.get(`step-${s.n}`)!, pos: s.pos! }));
     PLACES.forEach((p) => pins.push({ el: pinEls.current.get(`place-${p.name}`)!, pos: p.pos }));
     scene.setPins(pins);
+    if (scene instanceof PapercutScene) {
+      scene.setLabels(PAPERCUT_LABELS.map((l) => ({ key: l.key, el: pinEls.current.get(l.key)! })));
+      scene.onStage = (st) => setStage(st);
+      if (SHOW_FPS) scene.onFps = (f, note) => setFps({ fps: f, note });
+    }
     sceneRef.current = scene;
+    if (import.meta.env.DEV) (window as unknown as { __scene: unknown }).__scene = scene;
     const onChange = () => scene.setReducedMotion(mq.matches);
     mq.addEventListener('change', onChange);
     return () => {
@@ -66,6 +86,12 @@ export function App() {
         <canvas ref={canvasRef} aria-hidden="true" />
 
         <div className="pins">
+          {LOOK === 'papercut' &&
+            PAPERCUT_LABELS.map((l) => (
+              <span key={l.key} ref={setPinEl(l.key)} className={`pc-label ${l.kind}`}>
+                <span>{l.text}</span>
+              </span>
+            ))}
           {PLACES.map((p) => (
             <span key={p.name} ref={setPinEl(`place-${p.name}`)} className="place">
               <span>{p.name}</span>
@@ -120,10 +146,21 @@ export function App() {
           </button>
         </div>
 
+        {LOOK === 'papercut' && (
+          <PapercutDock
+            stage={stage}
+            fps={fps}
+            onRegion={() => sceneRef.current instanceof PapercutScene && sceneRef.current.showAll()}
+            onCity={(i) => sceneRef.current instanceof PapercutScene && sceneRef.current.goToCity(i)}
+          />
+        )}
+
         <p className="notice">
-          {LOOK !== 'plain'
-            ? 'Illustrative hills and buildings, not real map data.'
-            : 'Placeholder city. Pin positions are approximate.'}
+          {LOOK === 'papercut'
+            ? 'Real elevation. Stand-in buildings, not real.'
+            : LOOK !== 'plain'
+              ? 'Illustrative hills and buildings, not real map data.'
+              : 'Placeholder city. Pin positions are approximate.'}
         </p>
       </div>
 

@@ -98,7 +98,9 @@ Three looks exist side by side, chosen by a URL parameter:
 | `?look=model` | **White model.** Illustrative terraced hills, irregular districts, warm sunlight with cool shadows, ambient occlusion. |
 | `?look=cyan` | **Cyan.** The model look with cyan buildings on light grey ground, a white mosque, orange nodes, and windows drawn in the building shader. Based on an isometric reference image the owner sent. |
 
-Screenshots of all of these are in `docs/stage-1/` and `docs/look-mockup/`.
+| `?look=papercut` | **Papercut.** True-scale map of the Makkah to Madinah region in layered paper that zooms into 3D buildings. See "Papercut look" below. |
+
+Screenshots of all of these are in `docs/stage-1/` and `docs/look-mockup/`; Papercut is in `docs/papercut-stage-a.png`.
 
 ### Files
 
@@ -110,6 +112,17 @@ Screenshots of all of these are in `docs/stage-1/` and `docs/look-mockup/`.
 - `src/data/steps.ts`: the seven steps with pin positions.
 - `src/styles.css`: interface styles (Hanken Grotesk, green accent `#18794a`).
 - `scripts/fetch-osm.mjs`: downloads OpenStreetMap data from Overpass. Written but has never succeeded; see the blocker below.
+
+### Papercut look (Stage A, built)
+
+Open `/?look=papercut`. Add `&fps` to show the measured frame rate, `&quality=low` to start at lower detail, `&quality=high` to stop it ever dropping detail (for testing).
+
+- **Real:** the ground. Copernicus DEM GLO-30 (30 m), baked by `node scripts/bake-terrain.mjs` into `public/data/` (about 4.4 MB). Tiles are downloaded once into `data/raw/copernicus/` (gitignored). The map is true scale: Makkah to Madinah comes out at about 340 km. Colours show height above the local valley floor, not above sea level, so both cities sit on the lowest green layer. Open water is the teal layer. The source needs attribution: "Contains modified Copernicus data".
+- **Placeholder:** every building (`src/scene/papercutCity.ts`), the Haram and Nabawi massing (`papercutLandmarks.ts`), the Madinah mosque centre point (`geo.ts`) and the tower cluster position. Hotel, shop and home is a guess from height and distance.
+- **Code:** `src/scene/PapercutScene.ts` (scene, zoom stages, camera), `paperPaint.ts` (layered-paper texture), `src/PapercutDock.tsx` (jump buttons, zoom indicator, legend). The other looks use `CityScene.ts` and were not changed.
+- **Zoom stages** (camera distance to a city): the sharper ground patch fades in from 70 km, footprints from 30 km, buildings rise between 2.9 km and 1.2 km. Only the nearest city rises.
+- **Known limits:** the region ground is 145 m per cell, so contour lines look stepped between about 5 and 30 km. Not yet measured on a real phone; there is an automatic one-step drop to lower detail below 24 fps for three seconds.
+- **To use real buildings:** bake the OpenStreetMap files into a compact list and have `ensureBuildings()` load it instead of the generators.
 
 ### What is placeholder, and must not be mistaken for real
 

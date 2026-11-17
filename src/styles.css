@@ -345,11 +345,11 @@ h1 {
 /* Papercut look. Bricolage Grotesque, as in the Papercut theme. */
 .app[data-look='papercut'] {
   --font-body: 'Bricolage Grotesque', system-ui, sans-serif;
-  --accent: #1f6f78;
+  --accent: #4d6c62;
 }
 
 .app[data-look='papercut'] .stage {
-  background: #2f7a7c;
+  background: #77a79a;
 }
 
 .pc-label {
@@ -370,8 +370,8 @@ h1 {
   white-space: nowrap;
   font-size: 11px;
   font-weight: 500;
-  color: #1f2a44;
-  -webkit-text-stroke: 4px rgba(252, 246, 234, 0.95);
+  color: #4d6c62;
+  -webkit-text-stroke: 4px rgba(238, 221, 181, 0.95);
   paint-order: stroke fill;
   text-shadow: none;
 }
@@ -420,7 +420,7 @@ h1 {
   width: 12px;
   height: 12px;
   border-radius: 3px;
-  border: 1px solid rgba(31, 42, 68, 0.35);
+  border: 1px solid rgba(77, 108, 98, 0.45);
 }
 
 .pc-row {
@@ -439,8 +439,8 @@ h1 {
 }
 
 .pc-row button.is-on {
-  background: #1f2a44;
-  border-color: #1f2a44;
+  background: #4d6c62;
+  border-color: #4d6c62;
   color: #fff;
 }
 
@@ -461,14 +461,14 @@ h1 {
   width: 64px;
   height: 6px;
   border-radius: 3px;
-  background: rgba(31, 42, 68, 0.18);
+  background: rgba(77, 108, 98, 0.25);
   overflow: hidden;
 }
 
 .pc-bar b {
   position: absolute;
   inset: 0 auto 0 0;
-  background: #1f6f78;
+  background: #4d6c62;
 }
 
 .pc-fps {

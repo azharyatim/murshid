@@ -68,7 +68,7 @@ const PATCH_FULL = 22000;
 const MIN_DISTANCE = 120;
 const MAX_DISTANCE = 1_600_000;
 const NODE_COUNT = 150;
-const BG = 0x2f7a7c;
+const BG = 0x77a79a; // the water colour from the reference image
 
 const sstep = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));

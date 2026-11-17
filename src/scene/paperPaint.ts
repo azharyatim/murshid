@@ -6,24 +6,38 @@
 // look: a soft shadow on the lower right of each higher layer, a faint light
 // edge on its upper left, and a little grain.
 
-/**
- * The ground colours, all taken from the owner's reference image. Not every
- * colour in the image is used: its seafoam green (#8fb69e) is left out because
- * it is too close to the water colour. Layers 0-3 are open water; layers 4-11 are
- * land from the valley floor up, in the image's order from bottom to top. The
- * two highest layers share the warm orange.
- */
-export const GROUND_COLOURS = [
-  '#77a79a', '#77a79a', '#77a79a', '#77a79a', // water
-  '#a6c3a0', '#becfa3', '#d0d5a5', '#e2daa7', '#e8d29d', '#e8c28e', '#e5b27f', '#e5b27f',
+const PAPER: [number, string][] = [
+  [0, '#2f7a7c'],
+  [0.18, '#62a69a'],
+  [0.38, '#b5cf9e'],
+  [0.55, '#ecdca0'],
+  [0.72, '#f0b178'],
+  [0.86, '#d9795a'],
+  [1, '#f7efe2'],
 ];
-export const LAYERS = GROUND_COLOURS.length;
+export const LAYERS = 12;
 
-const LAYER_COLOURS = GROUND_COLOURS.map((c): [number, number, number] => [
+const hex = (c: string): [number, number, number] => [
   parseInt(c.slice(1, 3), 16),
   parseInt(c.slice(3, 5), 16),
   parseInt(c.slice(5, 7), 16),
-]);
+];
+
+function ramp(t: number): [number, number, number] {
+  for (let i = 1; i < PAPER.length; i++) {
+    if (t <= PAPER[i][0]) {
+      const [t0, c0] = PAPER[i - 1];
+      const [t1, c1] = PAPER[i];
+      const f = (t - t0) / (t1 - t0);
+      const a = hex(c0);
+      const b = hex(c1);
+      return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+    }
+  }
+  return hex(PAPER[PAPER.length - 1][1]);
+}
+
+const LAYER_COLOURS = Array.from({ length: LAYERS }, (_, b) => ramp((b + 0.5) / LAYERS));
 
 const smoothstep = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));

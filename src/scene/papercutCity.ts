@@ -18,18 +18,15 @@ export interface Building {
   k: Kind;
 }
 
-/**
- * Flat colours, all from the owner's reference image: the warm layer colours for
- * buildings and its two darker shadow greens for the mosque and the Kaabah.
- */
+/** Flat colours from the Papercut palette. */
 export const KIND_COLOUR: Record<Kind | 'kaabah' | 'dome', number> = {
   hotel: 0xe5b27f,
-  shop: 0xe8d29d,
-  home: 0xd0d5a5,
-  mosque: 0x5f7f72,
-  tower: 0xe8c28e,
-  kaabah: 0x4d6c62,
-  dome: 0x77a79a,
+  shop: 0xf0b178,
+  home: 0xf7efe2,
+  mosque: 0x1f6f78,
+  tower: 0xc7621f,
+  kaabah: 0x26324d,
+  dome: 0x62a69a,
 };
 
 function rng(seed: number) {

@@ -44,7 +44,7 @@ export function makkahLandmarks(): THREE.Group {
     geo.rotateX(-Math.PI / 2);
     g.add(shadowed(new THREE.Mesh(geo, mosque)));
   }
-  const floor = new THREE.Mesh(new THREE.CircleGeometry(MATAF_RADIUS + 1, 64), lambert(0xe2daa7));
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(MATAF_RADIUS + 1, 64), lambert(KIND_COLOUR.home));
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = 0.5;
   floor.receiveShadow = true;
@@ -83,7 +83,7 @@ export function madinahLandmarks(): THREE.Group {
   hall.position.y = 8;
   g.add(shadowed(hall));
 
-  const court = new THREE.Mesh(new THREE.BoxGeometry(150, 1, 90), lambert(0xe2daa7));
+  const court = new THREE.Mesh(new THREE.BoxGeometry(150, 1, 90), lambert(KIND_COLOUR.home));
   court.position.set(0, 16.4, -20);
   court.receiveShadow = true;
   g.add(court);

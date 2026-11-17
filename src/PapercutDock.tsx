@@ -6,10 +6,10 @@ import type { PaperStage } from './scene/PapercutScene';
 
 const LEGEND = [
   { label: 'Hotels', colour: '#e5b27f' },
-  { label: 'Shops', colour: '#e8d29d' },
-  { label: 'Homes', colour: '#d0d5a5' },
-  { label: 'Mosque', colour: '#5f7f72' },
-  { label: 'Towers', colour: '#e8c28e' },
+  { label: 'Shops', colour: '#f0b178' },
+  { label: 'Homes', colour: '#f7efe2' },
+  { label: 'Mosque', colour: '#1f6f78' },
+  { label: 'Towers', colour: '#c7621f' },
 ];
 
 interface Props {

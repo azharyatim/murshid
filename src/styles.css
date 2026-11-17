@@ -312,7 +312,49 @@ button:focus-visible {
 }
 
 .sheet-inner {
-  padding: 18px 20px calc(18px + env(safe-area-inset-bottom));
+  padding: 4px 20px calc(18px + env(safe-area-inset-bottom));
+}
+
+/* The bar at the top of the sheet: a grab handle that opens and closes it.
+   Collapsed (the default), it also shows the current title on one line. */
+.sheet-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 20px 6px;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.sheet.is-collapsed .sheet-toggle {
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+
+.sheet-grip {
+  align-self: center;
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+}
+
+.sheet-peek {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.sheet-peek-title {
+  font-size: 1.125rem;
+  font-weight: 640;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sheet-head {

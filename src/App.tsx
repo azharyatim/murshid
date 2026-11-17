@@ -120,6 +120,9 @@ const REAL_CITY = ['cyan-light', 'green', 'cyan-grey', 'clay-grey', 'day', 'pape
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);
   const [placeId, setPlaceId] = useState<string | null>(null);
+  // The bottom sheet starts collapsed (owner's request) so the map gets the room;
+  // choosing a step or a place opens it.
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [tilted, setTilted] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const legendRef = useRef<HTMLDivElement>(null);
@@ -197,6 +200,7 @@ export function App() {
 
   const choose = (n: number | null) => {
     setSelected(n);
+    if (n !== null) setSheetOpen(true);
     setPlaceId(null);
     const step = STEPS.find((s) => s.n === n);
     if (step?.pos) sceneRef.current?.focus(toScene(step.pos));
@@ -206,6 +210,7 @@ export function App() {
 
   const choosePlace = (p: Place) => {
     setSelected(null);
+    setSheetOpen(true);
     setPlaceId(p.id);
     sceneRef.current?.focus(sitePos(p), focusDistance(p));
     setTilted(true);
@@ -414,8 +419,28 @@ export function App() {
         </p>
       </div>
 
-      <main className="sheet">
-        <div className="sheet-inner">
+      <main className={`sheet${sheetOpen ? '' : ' is-collapsed'}`}>
+        <button
+          type="button"
+          className="sheet-toggle"
+          aria-expanded={sheetOpen}
+          aria-controls="sheet-body"
+          onClick={() => setSheetOpen((o) => !o)}
+        >
+          <span className="sheet-grip" aria-hidden="true" />
+          {sheetOpen ? (
+            <span className="sr-only">Hide details</span>
+          ) : (
+            <span className="sheet-peek">
+              <span className="step-count">
+                {place ? `Places · ${place.city}` : step ? `Step ${step.n} of ${STEPS.length}` : 'Umrah in seven steps'}
+              </span>
+              <span className="sheet-peek-title">{place ? place.name : step ? step.title : 'Where each step happens'}</span>
+              <span className="sr-only">: show details</span>
+            </span>
+          )}
+        </button>
+        <div className="sheet-inner" id="sheet-body" hidden={!sheetOpen}>
           <div className="sheet-head">
             <div>
               <p className="step-count">

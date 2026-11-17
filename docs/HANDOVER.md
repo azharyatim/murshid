@@ -172,7 +172,7 @@ The owner supplied the Day scheme on 13 November 2026 and asked for a colour-onl
 
 ## Private preview page
 
-The owner reviews on their phone through a private Claude page: https://claude.ai/artifact/TVMByBrJu5m5qKzZiPbjGL. It is built with `npx vite build --base ./ --outDir <scratch>/preview`, and the built `index.html` is reduced to its content (title, script, stylesheet, `#root`) because the Artifact tool adds the document wrapper. It now shows the Day scheme (the app's default). Republish to the same URL after changes.
+The owner reviews on their phone through a private Claude page: https://claude.ai/artifact/TVMByBrJu5m5qKzZiPbjGL. It is built with `npx vite build --base ./ --outDir <scratch>/preview`, and the built `index.html` is reduced to its content (title, script, stylesheet, `#root`) because the Artifact tool adds the document wrapper. It now shows the Day scheme (the app's default). A second private preview page shows the Papercut look on its own (built with `VITE_DEFAULT_LOOK=papercut`), because preview pages cannot take a `?look=` address: https://claude.ai/artifact/A79DHetx7R2TMWyFCPkvt2. Republish to the same URL after changes.
 
 ## Scope change: Makkah and Madinah guide (owner's decisions)
 
@@ -188,7 +188,7 @@ The owner reviews on their phone through a private Claude page: https://claude.a
 
 Adopted from branch `claude/hopeful-heisenberg-a1p880` (not merged; reference code only), adapted to this prototype. Opens on a contour map in layered paper and turns into 3D buildings as you zoom into Makkah. Behind `?look=papercut`; every other look and the default are unchanged. A separate private preview page shows it (see "Private preview page").
 
-- **Real:** the ground (Copernicus DEM GLO-30, 30 m, baked on that branch by `scripts/bake-terrain.mjs` into `public/data/terrain-*.bin`; attribution "Contains modified Copernicus data", shown on the map) and the buildings (this prototype's OpenStreetMap footprints and heights, not the branch's generated stand-ins). Clock Towers label position: from the OSM relation.
+- **Real:** the ground (Copernicus DEM GLO-30, 30 m, baked on that branch by `scripts/bake-terrain.mjs`, re-packed losslessly as greyscale PNGs by `scripts/terrain-to-png.mjs` (preview pages cannot serve .bin files) into `public/data/terrain-*.png`; attribution "Contains modified Copernicus data", shown on the map) and the buildings (this prototype's OpenStreetMap footprints and heights, not the branch's generated stand-ins). Clock Towers label position: from the OSM relation.
 - **Guessed:** building type for colour. Tagged hotels, shops and homes use their tags; anything 120 m or taller is a tower; untagged buildings are a guess (30 m or taller: hotel; lower and within 400 m of the Haram: shop; otherwise home), marked `g: 1` in `public/data/*.json`.
 - **Code:** `src/scene/papercut.ts` (colours, zoom distances, paper painter that converts the branch's Mercator terrain into this scene's projection), `setupPaper` / `updatePaper` in `src/scene/CityScene.ts`, `paperBuildingGeometry` in `realCity.ts`, legend and landmark labels in `App.tsx`.
 - **Zoom distances** (camera to city centre), scaled 1.2x from the branch because the real buildings cover about 1.8 km: ground patch fades in 84 to 26 km, footprints 36 to 11 km, buildings rise 3.5 to 1.45 km. Pins fade inside their ranges so sets hand over without overlapping.

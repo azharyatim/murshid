@@ -5,7 +5,8 @@
 //
 // Needs network access to copernicus-dem-30m.s3.amazonaws.com the first time.
 // Tiles are cached in data/raw/copernicus (gitignored). Output goes to
-// public/data/: terrain-region.bin, terrain-makkah.bin, terrain-madinah.bin
+// public/data/: terrain-region.bin, terrain-makkah.bin, terrain-madinah.bin (then run
+// scripts/terrain-to-png.mjs, which turns them into the PNGs the app loads and deletes them)
 // and terrain-meta.json.
 //
 // What is stored: not metres above sea level but a "paper height" t in 0..1

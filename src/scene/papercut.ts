@@ -223,3 +223,28 @@ export function worldRect(box: { lat0: number; lat1: number; lon0: number; lon1:
     z1: -(box.lat0 - REGION_ORIGIN.lat) * M_PER_LAT,
   };
 }
+
+/**
+ * Loads a baked terrain file. The heights are stored as an 8-bit greyscale PNG
+ * (see scripts/terrain-to-png.mjs) because preview pages cannot serve .bin
+ * files; decoded with no colour conversion so every byte comes back exactly.
+ */
+export async function loadTerrain(url: string): Promise<Uint8Array> {
+  const blob = await fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`could not load ${url}: ${r.status}`);
+    return r.blob();
+  });
+  const bmp = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  const { width: w, height: h } = bmp;
+  const cv = document.createElement('canvas');
+  cv.width = w;
+  cv.height = h;
+  const cx = cv.getContext('2d', { willReadFrequently: true })!;
+  cx.drawImage(bmp, 0, 0);
+  bmp.close();
+  const rgba = cx.getImageData(0, 0, w, h).data;
+  cv.width = cv.height = 1; // free the decoded image
+  const out = new Uint8Array(w * h);
+  for (let i = 0; i < out.length; i++) out[i] = rgba[i * 4];
+  return out;
+}

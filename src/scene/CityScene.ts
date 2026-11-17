@@ -26,6 +26,7 @@ import {
   PAPER_PLACEHOLDER,
   PAPER_STAGES,
   PAPER_TYPE_COLOUR,
+  loadTerrain,
   paintPaper,
   smoothstep,
   TERRAIN_REGION_LATLON,
@@ -587,16 +588,13 @@ export class CityScene {
     const p = this.paper!;
     const url = (f: string) => `${import.meta.env.BASE_URL}data/${f}`;
     try {
-      const [meta, buf] = await Promise.all([
-        fetch(url('terrain-meta.json')).then((r) => r.json()),
-        fetch(url('terrain-region.bin')).then((r) => r.arrayBuffer()),
-      ]);
+      const [meta, heights] = await Promise.all([fetch(url('terrain-meta.json')).then((r) => r.json()), loadTerrain(url('terrain-region.png'))]);
       p.meta = meta;
       const rect = worldRect(TERRAIN_REGION_LATLON);
       const max = this.renderer.capabilities.maxTextureSize;
       const th = Math.min(meta.region.nz, max);
       const tw = Math.min(max, Math.round((th * (rect.x1 - rect.x0)) / (rect.z1 - rect.z0)));
-      const cv = await paintPaper(new Uint8Array(buf), meta.region, rect, tw, th, 2, false);
+      const cv = await paintPaper(heights, meta.region, rect, tw, th, 2, false);
       const mesh = new THREE.Mesh(
         new THREE.PlaneGeometry(rect.x1 - rect.x0, rect.z1 - rect.z0),
         new THREE.MeshBasicMaterial({ map: this.paperTexture(cv), toneMapped: false }),
@@ -627,13 +625,12 @@ export class CityScene {
     const p = this.paper!;
     if (c.painted || !p.meta) return;
     c.painted = true;
-    const file = c.terrainKey === 'makkah' ? 'terrain-makkah.bin' : 'terrain-madinah.bin';
-    const buf = await fetch(`${import.meta.env.BASE_URL}data/${file}`).then((r) => r.arrayBuffer());
+    const heights = await loadTerrain(`${import.meta.env.BASE_URL}data/terrain-${c.terrainKey}.png`);
     const m = p.meta[c.terrainKey];
     const grid: TerrainGrid = { x: m.x - m.half, z: m.z - m.half, w: m.half * 2, h: m.half * 2, nx: m.n, nz: m.n };
     const size = Math.min(p.texSize, this.renderer.capabilities.maxTextureSize);
     const world = { x0: c.centre.x - 4000, x1: c.centre.x + 4000, z0: c.centre.z - 4000, z1: c.centre.z + 4000 };
-    const cv = await paintPaper(new Uint8Array(buf), grid, world, size, size, 5, true);
+    const cv = await paintPaper(heights, grid, world, size, size, 5, true);
     c.patchMat.map = this.paperTexture(cv);
     c.patchMat.needsUpdate = true;
     this.needsRender = true;

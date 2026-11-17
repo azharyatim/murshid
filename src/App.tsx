@@ -103,6 +103,8 @@ export function App() {
   const [tilted, setTilted] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const legendRef = useRef<HTMLDivElement>(null);
+  // Papercut: the colour key is closed by default (owner's choice) and opened with its button.
+  const [keyOpen, setKeyOpen] = useState(false);
   const sceneRef = useRef<CityScene | null>(null);
   const pinEls = useRef(new Map<string, HTMLElement>());
 
@@ -335,13 +337,20 @@ export function App() {
         </div>
 
         {PAPER && (
-          <div ref={legendRef} className="paper-legend" aria-label="Building colours" style={{ visibility: 'hidden' }}>
-            {PAPER_LEGEND.map((l) => (
-              <span key={l.name}>
-                <i style={{ background: l.colour }} aria-hidden="true" />
-                {l.name}
-              </span>
-            ))}
+          <div ref={legendRef} className="paper-key" style={{ visibility: 'hidden' }}>
+            {keyOpen && (
+              <div id="paper-legend" className="paper-legend" role="list" aria-label="Building colours">
+                {PAPER_LEGEND.map((l) => (
+                  <span key={l.name} role="listitem">
+                    <i style={{ background: l.colour }} aria-hidden="true" />
+                    {l.name}
+                  </span>
+                ))}
+              </div>
+            )}
+            <button type="button" className="paper-key-btn" aria-expanded={keyOpen} aria-controls="paper-legend" onClick={() => setKeyOpen((o) => !o)}>
+              {keyOpen ? 'Hide key' : 'Key'}
+            </button>
           </div>
         )}
 

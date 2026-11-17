@@ -98,9 +98,11 @@ export interface TerrainGrid {
   h: number;
   nx: number;
   nz: number;
+  /** Latitude/longitude box of the grid (whole degrees), written by bake-terrain.mjs. */
+  latlon?: { lat0: number; lat1: number; lon0: number; lon1: number };
 }
 
-/** Latitude/longitude box of the region terrain file (whole degrees; see bake-terrain.mjs). */
+/** Latitude/longitude box of the region terrain file for meta files that do not record it (the first bake, 39 to 41 E). */
 export const TERRAIN_REGION_LATLON = { lat0: 21, lat1: 25, lon0: 39, lon1: 41 };
 
 const hex = (c: string): [number, number, number] => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];

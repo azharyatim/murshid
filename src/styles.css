@@ -529,13 +529,34 @@ h1 {
   border-radius: 2px;
 }
 
-/* Papercut legend: one row of colour chips above the notice. It fades in as the
-   buildings rise. Uses the interface's own tokens (not restyled). */
-.paper-legend {
+/* Papercut colour key: a small button, closed by default (owner's choice), that
+   opens one row of colour chips above it. Both fade in as the buildings rise.
+   Uses the interface's own tokens (not restyled). */
+.paper-key {
   position: absolute;
   left: 12px;
   bottom: 44px;
   right: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.paper-key-btn {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: var(--sheet);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: auto;
+}
+
+.paper-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 2px 10px;
@@ -544,7 +565,6 @@ h1 {
   background: color-mix(in srgb, var(--sheet) 88%, transparent);
   color: var(--ink);
   font-size: 12px;
-  pointer-events: none;
 }
 
 .paper-legend span {

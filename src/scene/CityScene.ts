@@ -380,7 +380,8 @@ export class CityScene {
       // Keep the view from being dragged away from the mapped area.
       const t = this.controls.target;
       if (this.region) {
-        t.x = THREE.MathUtils.clamp(t.x, REGION_BOUNDS.minX, REGION_BOUNDS.maxX);
+        // Papercut's elevation reaches 38 E, so its map can be dragged further west (to Badr's coast).
+        t.x = THREE.MathUtils.clamp(t.x, this.paper ? -180_000 : REGION_BOUNDS.minX, REGION_BOUNDS.maxX);
         t.z = THREE.MathUtils.clamp(t.z, REGION_BOUNDS.minZ, REGION_BOUNDS.maxZ);
       } else {
         const d = Math.hypot(t.x, t.z);
@@ -590,7 +591,7 @@ export class CityScene {
     try {
       const [meta, heights] = await Promise.all([fetch(url('terrain-meta.json')).then((r) => r.json()), loadTerrain(url('terrain-region.png'))]);
       p.meta = meta;
-      const rect = worldRect(TERRAIN_REGION_LATLON);
+      const rect = worldRect(meta.region.latlon ?? TERRAIN_REGION_LATLON);
       const max = this.renderer.capabilities.maxTextureSize;
       const th = Math.min(meta.region.nz, max);
       const tw = Math.min(max, Math.round((th * (rect.x1 - rect.x0)) / (rect.z1 - rect.z0)));

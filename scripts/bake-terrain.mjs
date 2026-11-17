@@ -30,8 +30,9 @@ const project = (lat, lon) => [R * K * rad(lon - KAABAH.lon), -R * K * (merc(lat
 const unproject = (x, z) => ({ lat: unmerc(-z / (R * K) + merc(KAABAH.lat)), lon: KAABAH.lon + ((x / (R * K)) * 180) / Math.PI });
 
 // --- region and patches ---
-const REGION = { lat0: 21.0, lat1: 25.0, lon0: 39.0, lon1: 41.0 }; // whole degrees = whole tiles
-const RW = 1408, RH = 3072; // region raster size (cells of about 145 m)
+// Widened west to 38 E (owner's request, 17 Nov 2026) so Badr (38.8 E) and its coast are on the map.
+const REGION = { lat0: 21.0, lat1: 25.0, lon0: 38.0, lon1: 41.0 }; // whole degrees = whole tiles
+const RW = 2112, RH = 3072; // region raster size (cells of about 145 m)
 const PATCH_HALF = 4000, PN = 320; // city patch: 8 km square, 25 m cells
 
 // --- paper layers: height above local valley floor (m) where each layer starts.
@@ -56,7 +57,13 @@ for (let lat = REGION.lat0; lat < REGION.lat1; lat++) {
     if (!existsSync(file)) {
       mkdirSync('data/raw/copernicus', { recursive: true });
       console.log('downloading', name);
-      execFileSync('curl', ['-sS', '--fail', '-m', '600', '-o', file, `https://copernicus-dem-30m.s3.amazonaws.com/${name}/${name}.tif`], { stdio: 'inherit' });
+      try {
+        execFileSync('curl', ['-sS', '--fail', '-m', '600', '-o', file, `https://copernicus-dem-30m.s3.amazonaws.com/${name}/${name}.tif`], { stdio: 'inherit' });
+      } catch {
+        // Copernicus has no tile for open sea: treat a missing tile as sea (height 0).
+        console.log('no tile (open sea):', name);
+        continue;
+      }
     }
     const img = await (await fromFile(file)).getImage();
     const w = img.getWidth(), h = img.getHeight();
@@ -183,7 +190,7 @@ const meta = {
   source: 'Copernicus DEM GLO-30 (ESA / DLR / Airbus). Contains modified Copernicus data.',
   baked: new Date().toISOString(),
   layers: 12, layer0: LAYER0, edgesMetres: EDGES.slice(0, -1),
-  region: { x: rx0, z: rz0, w: rx1 - rx0, h: rz1 - rz0, nx: RW, nz: RH },
+  region: { x: rx0, z: rz0, w: rx1 - rx0, h: rz1 - rz0, nx: RW, nz: RH, latlon: REGION },
   makkah: patch('makkah', KAABAH),
   madinah: patch('madinah', NABAWI),
 };

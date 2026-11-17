@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CityScene, type Look, type Pin } from './scene/CityScene';
+import { CityScene, type Look, type PaperStage, type Pin } from './scene/CityScene';
 import {
   CLAY,
   CLAY_CYAN,
@@ -45,11 +45,31 @@ const CITY_LABELS = [
   { name: 'Madinah', placeId: 'nabawi' },
 ];
 
+/** Papercut readout: a camera distance in plain units. */
+function formatDistance(m: number) {
+  return m < 1000 ? `${Math.round(m / 10) * 10} m` : m < 20_000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m / 1000)} km`;
+}
+
 /** Papercut: extra landmark labels, from the map data. */
 function paperLandmarks(c: CityData): { name: string; pos: [number, number] }[] {
   const list: { name: string; pos: [number, number] }[] = [{ name: 'Kaabah', pos: [0, 0] }];
   if (c.landmarks.towers) list.push({ name: 'Abraj al-Bait (Clock Towers)', pos: c.landmarks.towers });
   return list;
+}
+
+/** Papercut: the Green Dome label (Madinah), at the dome's mapped outline, in regional metres. */
+function greenDome(m: CityData | null): [number, number] | null {
+  const b = m?.buildings.find((x) => x.dome);
+  if (!m || !b) return null;
+  const r = b.rings[0];
+  let x = 0;
+  let z = 0;
+  for (let i = 0; i < r.length; i += 2) {
+    x += r[i];
+    z += r[i + 1];
+  }
+  const [ox, oz] = regionXZ(m.origin.lat, m.origin.lon);
+  return [ox + x / (r.length / 2), oz + z / (r.length / 2)];
 }
 
 /** How far to stand back when a place is chosen (metres). */
@@ -105,6 +125,7 @@ export function App() {
   const legendRef = useRef<HTMLDivElement>(null);
   // Papercut: the colour key is closed by default (owner's choice) and opened with its button.
   const [keyOpen, setKeyOpen] = useState(false);
+  const [paperStage, setPaperStage] = useState<PaperStage | null>(null);
   const sceneRef = useRef<CityScene | null>(null);
   const pinEls = useRef(new Map<string, HTMLElement>());
 
@@ -144,7 +165,10 @@ export function App() {
     PLACES.forEach((p) => pins.push({ el: pinEls.current.get(`place-${p.name}`)!, pos: toScene(p.pos), ...street }));
     if (PAPER && regionNow && city) {
       paperLandmarks(city).forEach((l) => pins.push({ el: pinEls.current.get(`place-${l.name}`)!, pos: toScene(l.pos), ...street }));
+      const dome = greenDome(regionNow.madinah);
+      if (dome) pins.push({ el: pinEls.current.get('place-Green Dome')!, pos: dome, maxDist: STREET_VIEW });
       scene.setLegend(legendRef.current);
+      scene.onPaperStage = setPaperStage;
     }
     if (regionNow) {
       SITES.forEach((p) => {
@@ -246,6 +270,11 @@ export function App() {
         />
 
         <div className="pins">
+          {PAPER && greenDome(regional?.madinah ?? null) && (
+            <span ref={setPinEl('place-Green Dome')} className="place">
+              <span>Green Dome</span>
+            </span>
+          )}
           {PAPER &&
             city &&
             paperLandmarks(city).map((l) => (
@@ -337,6 +366,7 @@ export function App() {
         </div>
 
         {PAPER && (
+          <div className="paper-dock">
           <div ref={legendRef} className="paper-key" style={{ visibility: 'hidden' }}>
             {keyOpen && (
               <div id="paper-legend" className="paper-legend" role="list" aria-label="Building colours">
@@ -351,6 +381,25 @@ export function App() {
             <button type="button" className="paper-key-btn" aria-expanded={keyOpen} aria-controls="paper-legend" onClick={() => setKeyOpen((o) => !o)}>
               {keyOpen ? 'Hide key' : 'Key'}
             </button>
+          </div>
+          <div className="paper-jump" role="group" aria-label="Jump to">
+            {(['region', 0, 1] as const).map((t) => {
+              const name = t === 'region' ? 'Region' : t === 0 ? 'Makkah' : 'Madinah';
+              // The current place: the nearest city once within 60 km, otherwise the region.
+              const on = paperStage ? (paperStage.cityDistance > CITY_VIEW ? t === 'region' : t === paperStage.nearest) : t === 'region';
+              return (
+                <button key={name} type="button" className={on ? 'is-on' : ''} aria-pressed={on} onClick={() => sceneRef.current?.jumpTo(t)}>
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+          {paperStage && (
+            // TEMPORARY, for the owner's reference while tuning: zoom distance, stage and frame rate.
+            <p className="paper-readout" aria-live="off">
+              {formatDistance(paperStage.distance)} · {paperStage.level} · {paperStage.fps === null ? 'still' : `${paperStage.fps} fps`}
+            </p>
+          )}
           </div>
         )}
 

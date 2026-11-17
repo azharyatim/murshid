@@ -33,7 +33,7 @@ export const PAPER_OWNER = {
 export const PAPER_PLACEHOLDER = {
   higher: ['#EEC98E', '#F0B47B', '#E49469', '#DC8669', '#EECCBA'], // bands 7-11
   water: '#2F7A7C', // bands 0-3 and the map background
-  greenDome: '#62A69A', // not used yet (Madinah comes in stage B)
+  greenDome: '#62A69A', // the Green Dome in Madinah
 };
 
 export const PAPER_LAYERS = 12;

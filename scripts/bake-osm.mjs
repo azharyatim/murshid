@@ -41,6 +41,8 @@ const isMosque = (e) => city.mosque.some((m) => m.type === e.type && m.id === e.
 const KAABAH_WAY = city.kaabah ? city.origin.id : null;
 const MASA_NAME = "Sa'i / Al Masa'a Safa - Marwa";
 const MAQAM_NAME = 'Maqam Ibrahim';
+// Wikidata id of the Green Dome over the Prophet's Mosque (flagged so a look can colour it).
+const GREEN_DOME = 'Q727042';
 // Wikidata ids of features inside the mataf: Maqam Ibrahim, Hijr Isma'il.
 const HARAM_FEATURES = ['Q3696312', 'Q2080761'];
 
@@ -158,7 +160,7 @@ for (const e of els) {
   const kind = isMosque(e) || special || minaret ? 'haram' : t.building === 'roof' ? 'roof' : 'building';
   for (const o of outer) {
     // `simple`: kept as plain massing even if detailed parts exist inside it.
-    footprints.push({ kind, h, est, min: minHeightOf(t), outer: o, holes: inner.filter((r) => inside(r[0], o)), simple: special, tags: t });
+    footprints.push({ kind, h, est, min: minHeightOf(t), outer: o, holes: inner.filter((r) => inside(r[0], o)), simple: special, tags: t, dome: t.wikidata === GREEN_DOME });
   }
 }
 
@@ -217,6 +219,7 @@ for (const f of [...footprints.filter((f) => !f.replaced && !f.hidden), ...parts
   if (f.h <= f.min) continue;
   const b = { kind: f.kind, h: r1(f.h), rings: [flat(f.outer), ...f.holes.map(flat)] };
   if (f.kind !== 'haram') Object.assign(b, typeOf(f));
+  if (f.dome) b.dome = 1;
   if (f.min > 0) b.min = r1(f.min);
   if (f.est) {
     b.est = 1;

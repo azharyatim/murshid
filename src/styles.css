@@ -532,11 +532,55 @@ h1 {
 /* Papercut colour key: a small button, closed by default (owner's choice), that
    opens one row of colour chips above it. Both fade in as the buildings rise.
    Uses the interface's own tokens (not restyled). */
-.paper-key {
+/* Bottom-left stack in the Papercut look: key, jump buttons, temporary readout. */
+.paper-dock {
   position: absolute;
   left: 12px;
   bottom: 44px;
   right: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.paper-jump {
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+/* Same treatment as the Key button; the current place takes the accent, and is also announced as pressed. */
+.paper-jump button {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: var(--sheet);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.paper-jump button.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* TEMPORARY: zoom reference for the owner. */
+.paper-readout {
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--sheet) 88%, transparent);
+  color: var(--ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.paper-key {
   display: flex;
   flex-direction: column;
   align-items: flex-start;

@@ -31,6 +31,8 @@ export interface CityData {
     c?: 't' | 'h' | 's' | 'o';
     /** 1 when the type is a guess from height and position, not from map tags. */
     g?: 1;
+    /** 1 on the Green Dome (Madinah). */
+    dome?: 1;
   }[];
   roads: { w: number; pts: number[] }[];
 }
@@ -72,10 +74,16 @@ function extrude(rings: number[][], height: number, base = 0, baseShade?: number
  * Papercut look: every building and the mosque in one mesh, each building one
  * flat colour (no shading gradient), chosen by `colourOf`.
  */
-export function paperBuildingGeometry(data: CityData, colourOf: (b: CityData['buildings'][number]) => string) {
+export function paperBuildingGeometry(
+  data: CityData,
+  colourOf: (b: CityData['buildings'][number]) => string,
+  /** Optional height override [base, top] in metres, e.g. to set the Green Dome on the mosque roof. */
+  heightsOf?: (b: CityData['buildings'][number]) => [number, number] | null,
+) {
   const col = new THREE.Color();
   const parts = data.buildings.map((b) => {
-    const geo = extrude(b.rings, b.h, b.min ?? 0);
+    const [base, top] = heightsOf?.(b) ?? [b.min ?? 0, b.h];
+    const geo = extrude(b.rings, top, base);
     col.set(colourOf(b));
     const n = geo.attributes.position.count;
     const colors = new Float32Array(n * 3);

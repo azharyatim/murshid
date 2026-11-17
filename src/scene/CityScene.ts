@@ -41,6 +41,19 @@ import {
  */
 export type Look = 'plain' | 'model' | 'cyan' | 'papercut';
 
+/** What the Papercut interface needs to know about the zoom (see onPaperStage). */
+export interface PaperStage {
+  /** Camera distance to the point looked at, in metres. */
+  distance: number;
+  /** Camera distance to the nearest city's centre, in metres. */
+  cityDistance: number;
+  /** 0 = Makkah, 1 = Madinah. */
+  nearest: number;
+  level: 'Papercut map' | 'Footprints' | 'Rising' | '3D city';
+  /** Frames drawn per second over the last second; null while the map is still (nothing to draw). */
+  fps: number | null;
+}
+
 /** One city in the Papercut look: its sharper ground patch, shadow plane and rising buildings. */
 interface PaperCity {
   /** Where its centre is, in scene metres. */
@@ -189,7 +202,14 @@ export class CityScene {
     nearest: number;
     nodeScale: number;
     legend: HTMLElement | null;
+    /** Frames drawn in the current second, for the temporary readout. */
+    frames: number;
+    frameStart: number;
+    fps: number | null;
+    lastReport: number;
   } | null = null;
+  /** Papercut: called a few times a second with the zoom stage, for the jump buttons and the readout. */
+  onPaperStage: ((s: PaperStage) => void) | null = null;
   /**
    * Flat layers lying on the ground (sea, streets, road lines), each lifted a
    * little more than the one below. The lift grows with viewing distance: far
@@ -530,7 +550,20 @@ export class CityScene {
    * (3% to 100% height). See PAPER_STAGES for the distances.
    */
   private setupPaper(makkah: CityData, madinah: CityData | null, small: boolean) {
-    this.paper = { cities: [], meta: null, texSize: small ? 1536 : 2048, growth: 0, foot: 0, nearest: 0, nodeScale: -1, legend: null };
+    this.paper = {
+      cities: [],
+      meta: null,
+      texSize: small ? 1536 : 2048,
+      growth: 0,
+      foot: 0,
+      nearest: 0,
+      nodeScale: -1,
+      legend: null,
+      frames: 0,
+      frameStart: 0,
+      fps: null,
+      lastReport: 0,
+    };
     const make = (c: CityData, key: 'makkah' | 'madinah', root: THREE.Group, withBuildings: boolean) => {
       const patchMat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: 0, toneMapped: false });
       const patch = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000), patchMat);
@@ -553,9 +586,19 @@ export class CityScene {
         grow = new THREE.Group();
         grow.visible = false;
         root.add(grow);
+        // Lift the buildings just above the ground patch and shadow plane, so flat
+        // footprints (3% height, under half a metre for a low mosque) are never hidden by them.
+        this.flatLayers.push({ obj: grow, level: 3 });
         // One flat colour per building, by type; the mosque in the mosque colour.
         buildingMat = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0 });
-        const geo = paperBuildingGeometry(c, (b) => (b.kind === 'haram' ? PAPER_OWNER.mosque : PAPER_TYPE_COLOUR[b.c ?? 'o']));
+        // The Green Dome (Madinah) is mapped as a 6 m shape inside the mosque's 13 m
+        // outline, so it is set on the roof: base at the mosque's mapped height.
+        const roof = Math.max(0, ...c.buildings.filter((b) => b.kind === 'haram' && b.h < 40).map((b) => b.h));
+        const geo = paperBuildingGeometry(
+          c,
+          (b) => (b.dome ? PAPER_PLACEHOLDER.greenDome : b.kind === 'haram' ? PAPER_OWNER.mosque : PAPER_TYPE_COLOUR[b.c ?? 'o']),
+          (b) => (b.dome ? [roof, roof + b.h] : null),
+        );
         if (geo) {
           const mesh = new THREE.Mesh(geo, buildingMat);
           mesh.castShadow = true;
@@ -575,11 +618,10 @@ export class CityScene {
     };
     make(makkah, 'makkah', this.makkah, true);
     if (madinah) {
-      // Stage A: Madinah has its ground patch but no 3D buildings yet (stage B).
       const g = new THREE.Group();
       g.position.set(...this.cityOffset(madinah));
       this.scene.add(g);
-      make(madinah, 'madinah', g, false);
+      make(madinah, 'madinah', g, true);
     }
     // Let the first frame show before the heavy painting starts.
     setTimeout(() => void this.loadPaperRegion(), 30);
@@ -661,12 +703,22 @@ export class CityScene {
       c.patchMat.opacity = c.patchMat.map ? pa : 0;
       c.patch.visible = pa > 0.01 && Boolean(c.patchMat.map);
       if (d[i] < S.patchStart * 1.2) void this.ensurePatch(c);
-      if (i === 0) {
-        p.growth = g;
-        p.foot = f;
-      }
+      if (i === 0) p.growth = g; // nodes and step pins belong to Makkah
+      if (i === nearest) p.foot = f;
     });
     p.nearest = nearest;
+    const gn = smoothstep(S.growStart, S.growEnd, d[nearest]);
+    const now = performance.now();
+    if (this.onPaperStage && now - p.lastReport > 250) {
+      p.lastReport = now;
+      this.onPaperStage({
+        distance: this.distance(),
+        cityDistance: d[nearest],
+        nearest,
+        level: gn > 0.85 ? '3D city' : gn > 0.15 ? 'Rising' : p.foot > 0.05 ? 'Footprints' : 'Papercut map',
+        fps: p.fps,
+      });
+    }
     // The sun and its shadow map follow the nearest city only.
     const act = p.cities[nearest].centre;
     this.sun.target.position.copy(act);
@@ -679,10 +731,35 @@ export class CityScene {
       this.needsRender = true;
     }
     if (p.legend) {
-      const a = Math.min(1, Math.max(0, p.growth * 2 - 0.5));
+      // The key appears with whichever city is rising.
+      const a = Math.min(1, Math.max(0, gn * 2 - 0.5));
       p.legend.style.opacity = a.toFixed(2);
       p.legend.style.visibility = a > 0.04 ? 'visible' : 'hidden';
     }
+  }
+
+  /**
+   * Frames drawn per second, for the temporary readout. Only counted while the
+   * scene redraws every frame (moving, or nodes animating); a still map draws
+   * nothing, so it reports null rather than a misleading low number.
+   */
+  private countFrame(time: number, drawing: boolean) {
+    const p = this.paper!;
+    if (!p.frameStart) p.frameStart = time;
+    if (drawing) p.frames++;
+    if (time - p.frameStart >= 1000) {
+      const rate = (p.frames * 1000) / (time - p.frameStart);
+      p.fps = p.frames >= 3 ? Math.round(rate) : null;
+      p.frames = 0;
+      p.frameStart = time;
+    }
+  }
+
+  /** Papercut: jump to the region, or into a city's 3D view (0 = Makkah, 1 = Madinah). */
+  jumpTo(target: 'region' | 0 | 1) {
+    if (!this.paper || target === 'region') return this.showAll();
+    const c = this.paper.cities[target];
+    if (c) this.flyTo(c.centre.clone(), 1100, 0.85, this.tiltAzimuth());
   }
 
   /** Papercut: the colour legend, shown as the buildings rise. */
@@ -954,6 +1031,17 @@ export class CityScene {
     const vHalf = THREE.MathUtils.degToRad(this.camera.fov / 2);
     const hHalf = Math.atan(Math.tan(vHalf) * this.camera.aspect);
     let dist = (this.overview.radius * 1.22) / Math.sin(Math.min(vHalf, hHalf));
+    if (this.paper) {
+      // Papercut: the two cities fill the top half, leaving the bottom clear for the
+      // jump buttons and readout: Madinah 15% from the top, Makkah about 65%.
+      const box = this.overview.box;
+      const span = box.max.z - box.min.z;
+      dist = span / 0.5 / (2 * Math.tan(vHalf));
+      const visible = 2 * dist * Math.tan(vHalf);
+      const target = new THREE.Vector3((box.min.x + box.max.x) / 2, 0, box.min.z + (0.5 - 0.15) * visible);
+      this.flyTo(target, dist, AERIAL_POLAR, 0, animate);
+      return;
+    }
     if (this.region) {
       // Fit the long, narrow north-south box of the two cities by height and width separately.
       const size = this.overview.box.getSize(new THREE.Vector3());
@@ -1054,7 +1142,8 @@ export class CityScene {
     this.raf = requestAnimationFrame(this.tick);
     const dt = Math.min(0.05, (time - this.last) / 1000 || 0);
     this.last = time;
-    if (!this.reducedMotion) {
+    // Papercut: the nodes only animate (and keep the screen redrawing) while they are visible.
+    if (!this.reducedMotion && (!this.paper || this.nodeMesh.visible)) {
       for (const n of this.nodes) n.angle += n.speed * dt;
       this.placeNodes();
       this.needsRender = true;
@@ -1081,6 +1170,7 @@ export class CityScene {
       this.occlusionDirty = false;
       this.updateOcclusion();
     }
+    if (this.paper) this.countFrame(time, this.needsRender);
     if (this.needsRender) {
       if (this.composer) this.composer.render();
       else this.renderer.render(this.scene, this.camera);

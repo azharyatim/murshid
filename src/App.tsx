@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { CityScene, type Look as ClayLook, type Pin } from './scene/CityScene';
 import { PAPERCUT_LABELS, PapercutScene, type PaperStage } from './scene/PapercutScene';
 import { PapercutDock } from './PapercutDock';
+import { CUSTOM_GROUND, CUSTOM_KIND_COLOUR, KIND_COLOUR } from './scene/papercutCity';
+import { setLayerColours } from './scene/paperPaint';
 import { CLAY, CLAY_CYAN, CLAY_MODEL } from './themes';
 import { MARWA, SAFA, STEPS } from './data/steps';
 
@@ -17,7 +19,7 @@ const PLACES: { name: string; pos: [number, number] }[] = [
 
 // The plain look stays the default until the owner picks one.
 // Add ?look=model, ?look=cyan or ?look=papercut to the address to see the others.
-// Papercut extras: ?fps shows the measured frame rate; ?quality=low starts at lower detail, ?quality=high never drops detail.
+// Papercut extras: ?fps shows the measured frame rate; ?palette=custom uses the owner's colours; ?quality=low starts at lower detail, ?quality=high never drops detail.
 const PARAMS = new URLSearchParams(window.location.search);
 const LOOK_PARAM = PARAMS.get('look');
 type Look = ClayLook | 'papercut';
@@ -25,6 +27,11 @@ const LOOK: Look =
   LOOK_PARAM === 'model' || LOOK_PARAM === 'cyan' || LOOK_PARAM === 'papercut' ? LOOK_PARAM : 'plain';
 const CLAY_THEMES = { plain: CLAY, model: CLAY_MODEL, cyan: CLAY_CYAN };
 const SHOW_FPS = PARAMS.has('fps');
+// ?palette=custom uses the owner's chosen colours instead of the first palette.
+if (PARAMS.get('palette') === 'custom') {
+  Object.assign(KIND_COLOUR, CUSTOM_KIND_COLOUR);
+  setLayerColours(CUSTOM_GROUND);
+}
 const QUALITY = PARAMS.get('quality') === 'low' ? 'low' : PARAMS.get('quality') === 'high' ? 'high' : 'auto';
 const INITIAL_STAGE: PaperStage = { loading: true, nearest: 0, zoom: 0, growth: 0, legend: 0, level: 'Loading map' };
 

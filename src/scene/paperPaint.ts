@@ -39,6 +39,11 @@ function ramp(t: number): [number, number, number] {
 
 const LAYER_COLOURS = Array.from({ length: LAYERS }, (_, b) => ramp((b + 0.5) / LAYERS));
 
+/** Replace the colour of chosen layers (index -> '#rrggbb'). Call before the scene is created. */
+export function setLayerColours(overrides: Record<number, string>) {
+  for (const [i, c] of Object.entries(overrides)) LAYER_COLOURS[Number(i)] = hex(c);
+}
+
 const smoothstep = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);

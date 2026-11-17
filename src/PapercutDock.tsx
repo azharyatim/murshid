@@ -1,15 +1,17 @@
 import type { PaperStage } from './scene/PapercutScene';
+import { KIND_COLOUR } from './scene/papercutCity';
 
 // Zoom controls for the Papercut look: jump buttons, a zoom indicator that
 // shows which stage the map is in, and a colour legend that appears once the
 // buildings have risen. The colours are the building colours in the scene.
 
-const LEGEND = [
-  { label: 'Hotels', colour: '#e5b27f' },
-  { label: 'Shops', colour: '#f0b178' },
-  { label: 'Homes', colour: '#f7efe2' },
-  { label: 'Mosque', colour: '#1f6f78' },
-  { label: 'Towers', colour: '#c7621f' },
+const hexOf = (n: number) => '#' + n.toString(16).padStart(6, '0');
+const legend = () => [
+  { label: 'Hotels', colour: hexOf(KIND_COLOUR.hotel) },
+  { label: 'Shops', colour: hexOf(KIND_COLOUR.shop) },
+  { label: 'Homes', colour: hexOf(KIND_COLOUR.home) },
+  { label: 'Mosque', colour: hexOf(KIND_COLOUR.mosque) },
+  { label: 'Towers', colour: hexOf(KIND_COLOUR.tower) },
 ];
 
 interface Props {
@@ -24,7 +26,7 @@ export function PapercutDock({ stage, fps, onRegion, onCity }: Props) {
   return (
     <div className="pc-dock">
       <ul className="pc-legend" style={{ opacity: stage.legend }} aria-hidden={stage.legend < 0.1}>
-        {LEGEND.map((l) => (
+        {legend().map((l) => (
           <li key={l.label}>
             <i style={{ background: l.colour }} />
             {l.label}

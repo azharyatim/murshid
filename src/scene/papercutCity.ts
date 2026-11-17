@@ -19,7 +19,7 @@ export interface Building {
 }
 
 /** Flat colours from the Papercut palette. */
-export const KIND_COLOUR: Record<Kind | 'kaabah' | 'dome', number> = {
+export const KIND_COLOUR: Record<Kind | 'kaabah' | 'dome' | 'node', number> = {
   hotel: 0xe5b27f,
   shop: 0xf0b178,
   home: 0xf7efe2,
@@ -27,7 +27,24 @@ export const KIND_COLOUR: Record<Kind | 'kaabah' | 'dome', number> = {
   tower: 0xc7621f,
   kaabah: 0x26324d,
   dome: 0x62a69a,
+  node: 0x26324d,
 };
+
+/**
+ * The owner's own colours (the ones used in the vector export), chosen with
+ * ?palette=custom. Ground layers 4 to 6 are set here; the other layers, and the
+ * dome, keep the first palette because no colour was chosen for them.
+ */
+export const CUSTOM_KIND_COLOUR: Partial<typeof KIND_COLOUR> = {
+  hotel: 0xb7cd9b,
+  shop: 0xefc086,
+  home: 0xf7efe2,
+  mosque: 0xe49468,
+  tower: 0x60998a,
+  kaabah: 0x26324d,
+  node: 0x623c00,
+};
+export const CUSTOM_GROUND: Record<number, string> = { 4: '#ECDEC4', 5: '#EAE6C9', 6: '#E9DBA0' };
 
 function rng(seed: number) {
   let s = seed;

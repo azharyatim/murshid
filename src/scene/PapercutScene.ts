@@ -215,7 +215,7 @@ export class PapercutScene {
     // Travelling nodes circle the Kaabah anticlockwise. They appear once the buildings are mostly up.
     this.nodeMesh = new THREE.InstancedMesh(
       new THREE.SphereGeometry(1.7, 10, 8),
-      new THREE.MeshBasicMaterial({ color: KIND_COLOUR.kaabah }),
+      new THREE.MeshBasicMaterial({ color: KIND_COLOUR.node }),
       NODE_COUNT,
     );
     this.nodeMesh.frustumCulled = false;

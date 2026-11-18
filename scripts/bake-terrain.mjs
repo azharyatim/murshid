@@ -30,9 +30,10 @@ const project = (lat, lon) => [R * K * rad(lon - KAABAH.lon), -R * K * (merc(lat
 const unproject = (x, z) => ({ lat: unmerc(-z / (R * K) + merc(KAABAH.lat)), lon: KAABAH.lon + ((x / (R * K)) * 180) / Math.PI });
 
 // --- region and patches ---
-// Widened west to 38 E (owner's request, 17 Nov 2026) so Badr (38.8 E) and its coast are on the map.
-const REGION = { lat0: 21.0, lat1: 25.0, lon0: 38.0, lon1: 41.0 }; // whole degrees = whole tiles
-const RW = 2112, RH = 3072; // region raster size (cells of about 145 m)
+// Widened west to 38 E (owner's request, 17 Nov 2026) so Badr (38.8 E) and its coast are on the map,
+// and south to 20 N (18 Nov 2026) so the Yalamlam miqat (20.5 N) is too.
+const REGION = { lat0: 20.0, lat1: 25.0, lon0: 38.0, lon1: 41.0 }; // whole degrees = whole tiles
+const RW = 2112, RH = 3840; // region raster size (cells of about 145 m)
 const PATCH_HALF = 4000, PN = 320; // city patch: 8 km square, 25 m cells
 
 // --- paper layers: height above local valley floor (m) where each layer starts.

@@ -1,6 +1,6 @@
 {
  "source": "Copernicus DEM GLO-30 (ESA / DLR / Airbus). Contains modified Copernicus data.",
- "baked": "2026-11-17T22:03:47.470Z",
+ "baked": "2026-11-18T13:54:45.589Z",
  "layers": 12,
  "layer0": 4,
  "edgesMetres": [
@@ -17,11 +17,11 @@
   "x": -187130.95425316007,
   "z": -398961.1001610791,
   "w": 307410.3946771877,
-  "h": 445401.0349342928,
+  "h": 554800.883666337,
   "nx": 2112,
-  "nz": 3072,
+  "nz": 3840,
   "latlon": {
-   "lat0": 21,
+   "lat0": 20,
    "lat1": 25,
    "lon0": 38,
    "lon1": 41

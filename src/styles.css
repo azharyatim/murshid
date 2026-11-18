@@ -14,7 +14,8 @@
   /* Map pins: softer than the near-black ink, still 3:1 against white for the border. */
   --pin-line: #6b7c99;
   --pin-ink: #1e2a47;
-  --font-body: 'Hanken Grotesk Variable', system-ui, sans-serif;
+  /* Noto Naskh Arabic fills in characters Hanken lacks, such as \FDFA (the honorific after the Prophet's name). */
+  --font-body: 'Hanken Grotesk Variable', 'Noto Naskh Arabic Variable', system-ui, sans-serif;
   --font-arabic: 'Noto Naskh Arabic Variable', serif;
 }
 
@@ -664,4 +665,12 @@ h1 {
   height: 10px;
   border-radius: 2px;
   border: 1px solid var(--line);
+}
+
+/* Miqat view: the miqat pins show only after the "At the miqat" chip is tapped, and
+   then the other place pins and city names step aside (the Makkah name stays as the
+   reference point). Choosing a step or another place leaves the view. */
+.pins:not(.miqat-mode) .spot.is-miqat,
+.pins.miqat-mode > :not(.is-miqat):not(.keep-in-miqat) {
+  display: none;
 }

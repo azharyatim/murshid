@@ -121,7 +121,8 @@ const MAX_DISTANCE = 2600;
 /** With the regional map: far enough out to see Makkah and Madinah together. */
 const MAX_DISTANCE_REGION = 1_600_000;
 /** The regional map's area, in metres from its origin, that the view may be dragged across. */
-const REGION_BOUNDS = { minX: -120_000, maxX: 100_000, minZ: -210_000, maxZ: 215_000 };
+// maxZ reaches the Yalamlam miqat (20.5 N), about 270 km south of the origin.
+const REGION_BOUNDS = { minX: -120_000, maxX: 100_000, minZ: -210_000, maxZ: 290_000 };
 
 const MIN_POLAR = 0.02; // straight down
 const MAX_POLAR = 1.3; // close to the horizon
@@ -1061,6 +1062,22 @@ export class CityScene {
   /** Move in on one point, keeping the current compass direction. */
   focus(pos: [number, number], distance = 720) {
     this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), distance, 0.75, this.tiltAzimuth());
+  }
+
+  /** Fit a set of points (scene metres) on screen from above, north up. Used for the miqat view. */
+  frame(points: [number, number][]) {
+    const box = new THREE.Box3();
+    points.forEach(([x, z]) => box.expandByPoint(new THREE.Vector3(x, 0, z)));
+    const size = box.getSize(new THREE.Vector3());
+    const vHalf = THREE.MathUtils.degToRad(this.camera.fov / 2);
+    const hHalf = Math.atan(Math.tan(vHalf) * this.camera.aspect);
+    // Leave room for the labels beside each pin, and (Papercut) the buttons at the bottom.
+    const dist = Math.max(size.z / 2 / Math.tan(vHalf), size.x / 2 / Math.tan(hHalf)) * (this.paper ? 1.9 : 1.45);
+    const centre = box.getCenter(new THREE.Vector3());
+    // Shift the points left of centre, clear of the map buttons on the right (labels sit to the right of each pin).
+    centre.x += 0.12 * 2 * dist * Math.tan(hHalf);
+    if (this.paper) centre.z += 0.12 * 2 * dist * Math.tan(vHalf);
+    this.flyTo(centre, dist, AERIAL_POLAR, 0);
   }
 
   /** Move to a point from straight above, at a given distance (used for whole cities). */

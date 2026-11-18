@@ -27,6 +27,10 @@ export interface Place {
   /** What the pin marks, when that is not obvious. */
   pinNote?: string;
   sources: Source[];
+  /** Miqats are shown differently: with the region map and the miqat chip. */
+  kind?: 'miqat';
+  /** For a miqat: only what its sources say (who it is for). No rulings. */
+  note?: string;
 }
 
 const hadith = (label: string, id: number): Source => ({ label, url: `https://search.hadith-mcp.org/?id=${id}` });
@@ -96,7 +100,77 @@ export const PLACES: Place[] = [
     sources: [{ label: 'Quran 3:123', url: 'https://quran.com/3:123' }],
   },
   // Al-Baqi' is approved but its outline was not in the downloads; added once it is.
+
+  // ---- Miqats (owner approved 18 Nov 2026). Positions: the "Miqat" monuments in
+  // OpenStreetMap (export of 18 Nov 2026), each with a Wikidata link. Notes say only
+  // who each miqat is for, as the cited hadith say. No rulings (stage 2, scholar review).
+  {
+    id: 'miqat-dhul-hulaifah',
+    name: "Dhul-Hulaifah (Abyar 'Ali)",
+    short: 'Dhul-Hulaifah',
+    city: 'Madinah',
+    lat: 24.4137405,
+    lon: 39.5428117,
+    osm: 'way/457470976 (Miqat Dhul Hulaifah, wikidata Q6783320)',
+    kind: 'miqat',
+    note: 'Miqat for the people of Madinah, and for others who come through it.',
+    sources: [hadith('Sahih al-Bukhari 1477', 1477), hadith('Sahih al-Bukhari 1478', 1478)],
+  },
+  {
+    id: 'miqat-juhfah',
+    name: 'Al-Juhfah',
+    short: 'Al-Juhfah',
+    city: 'Makkah',
+    lat: 22.7054134,
+    lon: 39.146905,
+    osm: 'way/456361985 (Miqat Al-Juhfah, wikidata Q12185431)',
+    kind: 'miqat',
+    note: 'Miqat for the people of Sham, and for others who come through it.',
+    sources: [hadith('Sahih al-Bukhari 1477', 1477), hadith('Sahih al-Bukhari 1478', 1478)],
+  },
+  {
+    id: 'miqat-qarn',
+    name: 'Qarn al-Manazil (As-Sayl al-Kabir)',
+    short: 'Qarn al-Manazil',
+    city: 'Makkah',
+    lat: 21.6334899,
+    lon: 40.4275143,
+    osm: 'way/457491862 (Miqat Qarn Al Manazil, wikidata Q12232506)',
+    kind: 'miqat',
+    note: 'Miqat for the people of Najd, and for others who come through it.',
+    sources: [hadith('Sahih al-Bukhari 1477', 1477), hadith('Sahih al-Bukhari 1478', 1478)],
+  },
+  {
+    id: 'miqat-yalamlam',
+    name: "Yalamlam (As-Sa'diyyah)",
+    short: 'Yalamlam',
+    city: 'Makkah',
+    lat: 20.51715,
+    lon: 39.8711027,
+    osm: 'way/456362592 (Miqat Yalamlam, wikidata Q3595659)',
+    kind: 'miqat',
+    note: 'Miqat for the people of Yemen, and for others who come through it.',
+    sources: [hadith('Sahih al-Bukhari 1477', 1477), hadith('Sahih al-Bukhari 1478', 1478)],
+  },
+  {
+    id: 'miqat-dhat-irq',
+    name: "Dhat 'Irq",
+    short: "Dhat 'Irq",
+    city: 'Makkah',
+    lat: 21.930132,
+    lon: 40.42565,
+    osm: 'way/457487766 (Miqat Dhaatu IRQ, wikidata Q12212593)',
+    kind: 'miqat',
+    note: "Miqat for the people of Iraq. The narrations differ on who set it: one says the Prophet \u{FDFA} set it; another says Umar did.",
+    sources: [
+      hadith('Sunan Abi Dawud 1740 (the Prophet \u{FDFA})', 22244),
+      hadith("Sunan an-Nasa'i 2661 (the Prophet \u{FDFA})", 17397),
+      hadith('Bulugh al-Maram 833, citing al-Bukhari (Umar)', 49950),
+    ],
+  },
 ];
+
+export const MIQATS = PLACES.filter((p) => p.kind === 'miqat');
 
 /** The two mosques that distances are measured from. */
 export const MOSQUES = PLACES.filter((p) => p.id === 'haram' || p.id === 'nabawi');

@@ -189,7 +189,11 @@ The owner reviews on their phone through a private Claude page: https://claude.a
 - Show the five miqats as pins on the existing map (Day and Papercut); the "1 2 At the miqat" chip will fly out to show them all.
 - Sources (Hadith tool): Dhul-Hulaifah (Madinah), Al-Juhfah (Sham), Qarn al-Manazil (Najd), Yalamlam (Yemen): Sahih al-Bukhari 1477 and 1478 (tool ids 1477, 1478). Dhat 'Irq (Iraq): included at the owner's request, with BOTH accounts shown: set by the Prophet ﷺ (Abu Dawud 1740, tool id 22244; Nasa'i 2661, tool id 17397) and set by Umar (Bukhari as cited in Bulugh al-Maram 833, tool id 49950).
 - Positions must come from OpenStreetMap (owner downloads; the session cannot reach Nominatim or Wikidata). Show only what the sources say: who each miqat is for and where it is. No rulings (stage 2 and scholar review).
-- If Yalamlam lies south of 21 N, extend the elevation bake south (owner approved).
+- **Built 18 Nov 2026.** Positions: the "Miqat" monuments in the owner's OpenStreetMap export (`data/raw/miqat.json`, gitignored), each with a Wikidata link; see `MIQATS` in `src/data/places.ts`. Yalamlam is at 20.5 N, so the elevation bake now covers 20 to 25 N (3840 rows); this nudged the city patches by at most 1/255 (414 Makkah cells changed layer, at layer edges; none in Madinah).
+- The "1 2 At the miqat" chip opens the miqat view: the five miqat pins framed on the region map, with only the Makkah name kept as the reference; choosing a step or another place leaves it. Tapping a miqat shows who it is for (from the hadith), its sources, and the straight-line distance from Masjid al-Haram.
+- Also in the export, not shown, needs the owner: "Miqat Wadi Mahram" (way 1493000494) near Qarn al-Manazil, and "Miqat al-Hada" (node 5423164921). Whether to show them is a religious question.
+- The Day look has no roads or coastline south of 21.1 N (its regional download stopped there), so Yalamlam sits on plain ground there; Papercut has elevation down to 20 N.
+- Fixed a "ghost click": a map tap that opened the sheet moved the jump buttons under the finger, and the browser's follow-up click pressed one. Clicks within 600 ms and 30 px of a handled map tap are ignored.
 
 ## Bottom sheet collapsed by default (owner, 18 Nov 2026)
 

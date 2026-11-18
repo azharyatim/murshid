@@ -14,7 +14,7 @@ import {
 } from './themes';
 import { PAPER_OWNER, PAPER_STAGES } from './scene/papercut';
 import { MARWA, SAFA, STEPS } from './data/steps';
-import { MOSQUES, PLACES as SITES, type Place } from './data/places';
+import { MIQATS, MOSQUES, PLACES as SITES, type Place } from './data/places';
 import { loadCity, loadRegion, type CityData, type RegionData } from './scene/realCity';
 import { distanceMetres, regionXZ } from './scene/projection';
 
@@ -74,6 +74,7 @@ function greenDome(m: CityData | null): [number, number] | null {
 
 /** How far to stand back when a place is chosen (metres). */
 function focusDistance(p: Place) {
+  if (p.kind === 'miqat') return 9000;
   if (p.id === 'badr') return 6000;
   return p.id === 'haram' || p.id === 'nabawi' ? 1500 : 2500;
 }
@@ -81,7 +82,11 @@ function focusDistance(p: Place) {
 /** Straight-line distance from the nearer of the two mosques, in plain words. */
 function distanceText(p: Place) {
   if (MOSQUES.some((m) => m.id === p.id)) return null;
-  const [m, d] = MOSQUES.map((m) => [m, distanceMetres(m, p)] as const).sort((a, b) => a[1] - b[1])[0];
+  // Miqats are measured from Masjid al-Haram, the destination; other places from the nearer mosque.
+  const [m, d] =
+    p.kind === 'miqat'
+      ? [MOSQUES[0], distanceMetres(MOSQUES[0], p)]
+      : MOSQUES.map((m) => [m, distanceMetres(m, p)] as const).sort((a, b) => a[1] - b[1])[0];
   const amount = d < 1000 ? `${Math.round(d / 50) * 50} m` : d < 20_000 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d / 1000)} km`;
   return `About ${amount} from ${m.short}, in a straight line. Walking and travel routes come later.`;
 }
@@ -123,6 +128,8 @@ export function App() {
   // The bottom sheet starts collapsed (owner's request) so the map gets the room;
   // choosing a step or a place opens it.
   const [sheetOpen, setSheetOpen] = useState(false);
+  // The miqat view (from the "At the miqat" chip): the five miqats on the region map.
+  const [miqatMode, setMiqatMode] = useState(false);
   const [tilted, setTilted] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const legendRef = useRef<HTMLDivElement>(null);
@@ -177,7 +184,9 @@ export function App() {
       SITES.forEach((p) => {
         // Badr stays visible from far out; the others appear once a city fills the view.
         // The Haram's own pin gives way to the step pins up close.
-        const range = p.id === 'badr' ? {} : { maxDist: CITY_VIEW, ...(p.id === 'haram' ? { minDist: STREET_VIEW } : {}) };
+        // Miqats show at any distance, but only in the miqat view (see .miqat-mode in styles.css).
+        const range =
+          p.id === 'badr' || p.kind === 'miqat' ? {} : { maxDist: CITY_VIEW, ...(p.id === 'haram' ? { minDist: STREET_VIEW } : {}) };
         pins.push({ el: pinEls.current.get(`site-${p.id}`)!, pos: sitePos(p), ...range });
       });
       CITY_LABELS.forEach((c) => {
@@ -201,6 +210,7 @@ export function App() {
   const choose = (n: number | null) => {
     setSelected(n);
     if (n !== null) setSheetOpen(true);
+    setMiqatMode(false);
     setPlaceId(null);
     const step = STEPS.find((s) => s.n === n);
     if (step?.pos) sceneRef.current?.focus(toScene(step.pos));
@@ -211,9 +221,27 @@ export function App() {
   const choosePlace = (p: Place) => {
     setSelected(null);
     setSheetOpen(true);
+    if (p.kind !== 'miqat') setMiqatMode(false);
     setPlaceId(p.id);
+    if (p.kind === 'miqat') {
+      // Nothing stands at a miqat on this map, so look straight down on it.
+      sceneRef.current?.lookDownAt(sitePos(p), focusDistance(p));
+      setTilted(false);
+      return;
+    }
     sceneRef.current?.focus(sitePos(p), focusDistance(p));
     setTilted(true);
+  };
+
+  /** The "At the miqat" chip: steps 1 and 2, and (with the regional map) the five miqats framed. */
+  const openMiqats = () => {
+    if (!showRegion) return choose(MIQAT_STEPS[0].n);
+    setSelected(MIQAT_STEPS[0].n);
+    setPlaceId(null);
+    setSheetOpen(true);
+    setMiqatMode(true);
+    sceneRef.current?.frame(MIQATS.map(sitePos));
+    setTilted(false);
   };
 
   /** Tapping a city name zooms to the whole city, looking straight down. */
@@ -237,8 +265,28 @@ export function App() {
     tapStart.current = null;
     if (!start || start.id !== e.pointerId) return;
     if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 8 || e.timeStamp - start.t > 600) return;
+    // The browser follows a tap with its own click a moment later. If the tap opens
+    // the sheet, the map shrinks and that click would land on whatever button has
+    // moved under the finger (a "ghost click"), so ignore it.
+    suppressClickUntil.current = performance.now() + 600;
+    suppressAt.current = { x: e.clientX, y: e.clientY };
     tapAt(e.clientX, e.clientY);
   };
+  const suppressClickUntil = useRef(0);
+  const suppressAt = useRef({ x: 0, y: 0 });
+  useEffect(() => {
+    const swallow = (ev: MouseEvent) => {
+      // Only browser-made clicks (from a touch); clicks the app makes itself pass.
+      const near = Math.hypot(ev.clientX - suppressAt.current.x, ev.clientY - suppressAt.current.y) < 30;
+      if (ev.isTrusted && near && performance.now() < suppressClickUntil.current) {
+        suppressClickUntil.current = 0;
+        ev.stopPropagation();
+        ev.preventDefault();
+      }
+    };
+    document.addEventListener('click', swallow, true);
+    return () => document.removeEventListener('click', swallow, true);
+  }, []);
   const tapAt = (x: number, y: number) => {
     let best: { el: HTMLElement; d: number } | null = null;
     for (const el of pinEls.current.values()) {
@@ -274,7 +322,7 @@ export function App() {
           }}
         />
 
-        <div className="pins">
+        <div className={`pins${miqatMode ? ' miqat-mode' : ''}`}>
           {PAPER && greenDome(regional?.madinah ?? null) && (
             <span ref={setPinEl('place-Green Dome')} className="place">
               <span>Green Dome</span>
@@ -298,7 +346,8 @@ export function App() {
                 key={c.name}
                 ref={setPinEl(`city-${c.name}`)}
                 type="button"
-                className="city-label"
+                // In the miqat view the Makkah name stays, as the point the miqats surround.
+                className={`city-label${c.name === 'Makkah' ? ' keep-in-miqat' : ''}`}
                 onClick={() => openCity(c.placeId)}
               >
                 <span>{c.name}</span>
@@ -310,7 +359,7 @@ export function App() {
                 key={p.id}
                 ref={setPinEl(`site-${p.id}`)}
                 type="button"
-                className={`spot${placeId === p.id ? ' is-on' : ''}`}
+                className={`spot${p.kind === 'miqat' ? ' is-miqat' : ''}${placeId === p.id ? ' is-on' : ''}`}
                 aria-label={p.name}
                 aria-pressed={placeId === p.id}
                 onClick={() => choosePlace(p)}
@@ -339,7 +388,7 @@ export function App() {
         <button
           type="button"
           className={`miqat${MIQAT_STEPS.some((s) => s.n === selected) ? ' is-on' : ''}`}
-          onClick={() => choose(MIQAT_STEPS[0].n)}
+          onClick={openMiqats}
         >
           <span className="miqat-nums" aria-hidden="true">
             {MIQAT_STEPS.map((s) => (
@@ -433,7 +482,7 @@ export function App() {
           ) : (
             <span className="sheet-peek">
               <span className="step-count">
-                {place ? `Places · ${place.city}` : step ? `Step ${step.n} of ${STEPS.length}` : 'Umrah in seven steps'}
+                {place ? (place.kind === 'miqat' ? 'Miqat' : `Places · ${place.city}`) : step ? `Step ${step.n} of ${STEPS.length}` : 'Umrah in seven steps'}
               </span>
               <span className="sheet-peek-title">{place ? place.name : step ? step.title : 'Where each step happens'}</span>
               <span className="sr-only">: show details</span>
@@ -444,7 +493,7 @@ export function App() {
           <div className="sheet-head">
             <div>
               <p className="step-count">
-                {place ? `Places · ${place.city}` : step ? `Step ${step.n} of ${STEPS.length}` : 'Umrah in seven steps'}
+                {place ? (place.kind === 'miqat' ? 'Miqat' : `Places · ${place.city}`) : step ? `Step ${step.n} of ${STEPS.length}` : 'Umrah in seven steps'}
               </p>
               <h1>{place ? place.name : step ? step.title : 'Where each step happens'}</h1>
             </div>
@@ -457,7 +506,7 @@ export function App() {
           {place ? (
             <div className="place-info">
               <p className="lede">
-                {place.pinNote ? `${place.pinNote} ` : ''}The description will be written from the sources below.
+                {place.note ?? `${place.pinNote ? `${place.pinNote} ` : ''}The description will be written from the sources below.`}
               </p>
               {distance && <p className="place-distance">{distance}</p>}
               <h2 className="sources-title">Sources</h2>

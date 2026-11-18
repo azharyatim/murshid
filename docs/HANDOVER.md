@@ -184,6 +184,13 @@ The owner reviews on their phone through a private Claude page: https://claude.a
 - **Place list merged** with the owner's own list (13 Nov 2026), which added Taif (Masjid Abdullah ibn Abbas, rose farms and factory), Badr, a date farm, Jabal al-Rumah and al-Hudaybiyah. The opening map shows Makkah and Madinah only; Taif and Badr are reached by zooming or dragging. Place names show the standard English spelling with the owner's spelling in brackets, e.g. "Jabal Thawr (Jabal Tsur)".
 - The Madinah 3D core needs the same two OpenStreetMap downloads as Makkah (buildings and roads, then building parts), centred on the Prophet's Mosque.
 
+## Miqat points on the map (owner approved 18 Nov 2026; in progress)
+
+- Show the five miqats as pins on the existing map (Day and Papercut); the "1 2 At the miqat" chip will fly out to show them all.
+- Sources (Hadith tool): Dhul-Hulaifah (Madinah), Al-Juhfah (Sham), Qarn al-Manazil (Najd), Yalamlam (Yemen): Sahih al-Bukhari 1477 and 1478 (tool ids 1477, 1478). Dhat 'Irq (Iraq): included at the owner's request, with BOTH accounts shown: set by the Prophet ﷺ (Abu Dawud 1740, tool id 22244; Nasa'i 2661, tool id 17397) and set by Umar (Bukhari as cited in Bulugh al-Maram 833, tool id 49950).
+- Positions must come from OpenStreetMap (owner downloads; the session cannot reach Nominatim or Wikidata). Show only what the sources say: who each miqat is for and where it is. No rulings (stage 2 and scholar review).
+- If Yalamlam lies south of 21 N, extend the elevation bake south (owner approved).
+
 ## Bottom sheet collapsed by default (owner, 18 Nov 2026)
 
 In every look the bottom sheet starts collapsed to a grab-handle bar with the current title, so the map has more room. Tapping the bar opens and closes it; choosing a step or a place opens it. See `sheetOpen` in `src/App.tsx` and `.sheet-toggle` in `src/styles.css`.

@@ -493,7 +493,9 @@ export class CityScene {
       if (mode === 'pinch') {
         sph.radius = THREE.MathUtils.clamp((sph.radius * prev.dist) / p.dist, this.controls.minDistance, this.controls.maxDistance);
       } else if (mode === 'twist') {
-        sph.theta -= angleDiff(p.angle, prev.angle);
+        // Turn the map the same way the fingers turn (screen angles grow clockwise,
+        // and a clockwise map turn moves the camera the other way round the target).
+        sph.theta += angleDiff(p.angle, prev.angle);
       } else {
         // Sliding up tilts towards the horizon, sliding down looks straight down.
         sph.phi = THREE.MathUtils.clamp(sph.phi - ((p.mid.y - prev.mid.y) / el.clientHeight) * Math.PI * 0.9, MIN_POLAR, MAX_POLAR);

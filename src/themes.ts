@@ -14,6 +14,20 @@ export interface SceneTheme {
   sky: number;
   skyGround: number;
   skyIntensity: number;
+  /** Brightness at the foot of each building, 0 to 1 (model looks only). Default 0.8. */
+  baseShade?: number;
+  /** How much of the building colour shows regardless of light, 0 to 1. Flattens shading. Default 0. */
+  buildingGlow?: number;
+  /** Colour buildings show regardless of light. Overrides buildingGlow when set. */
+  buildingEmissive?: number;
+  /** Road colour on real map data. Defaults to the slab colour. */
+  road?: number;
+  /** How dark cast shadows are, 0 (none) to 1 (full). Default 1. */
+  shadowStrength?: number;
+  /** Regional map: the sea. Defaults to the background colour. */
+  sea?: number;
+  /** Regional map: the railway. Defaults to the road colour. */
+  rail?: number;
 }
 
 export const CLAY: SceneTheme = {
@@ -61,4 +75,106 @@ export const CLAY_CYAN: SceneTheme = {
   sky: 0xe4ecff,
   skyGround: 0xeeeeee,
   skyIntensity: 1.3,
+};
+
+/** Cyan option A: shaded sides lifted so they stay cyan instead of turning teal. */
+export const CLAY_CYAN_LIGHT: SceneTheme = {
+  ...CLAY_CYAN,
+  // The owner's beige (#efe6d3 from their reference image), then made 50% lighter
+  // at their request: each colour is halfway between the original and white.
+  background: 0xf7f3e9,
+  ground: 0xf7f3e9,
+  slab: 0xf9f5ed,
+  skyGround: 0xf7f3e9,
+  road: 0xf2ece0,
+  // Cast shadows at half strength, at the owner's request.
+  shadowStrength: 0.5,
+  sunIntensity: 2.1,
+  skyIntensity: 2.0,
+  baseShade: 0.93,
+  buildingGlow: 0.18,
+};
+
+/** Cyan option B: flat, illustration-style shading with only gentle light and shade. */
+export const CLAY_CYAN_FLAT: SceneTheme = {
+  ...CLAY_CYAN,
+  // Only the buildings are flattened: a dim lit colour plus a fixed glow, so
+  // sides differ from tops only gently. Ground, mosque and light are unchanged.
+  building: 0x1c6668,
+  buildingEmissive: 0x40b4b6,
+  baseShade: 1,
+};
+
+/**
+ * Mint green buildings on very light grey ground, from a second reference image
+ * the owner sent (sampled: lit walls about #6edbad, ground about #e7e9ea).
+ * Same lighting as option A; base colours are set a touch off the samples so the
+ * rendered colours land near them.
+ */
+export const CLAY_GREEN: SceneTheme = {
+  ...CLAY_CYAN_LIGHT,
+  shadowStrength: 1,
+  building: 0x5ccf9c,
+  background: 0xebedee,
+  ground: 0xebedee,
+  slab: 0xf0f2f2,
+  skyGround: 0xebedee,
+  road: 0xdfe3e4,
+};
+
+/** Very light grey ground shared by the grey-ground looks (owner's sample about #e7e9ea). */
+const LIGHT_GREY_GROUND = {
+  background: 0xebedee,
+  ground: 0xebedee,
+  slab: 0xf0f2f2,
+  skyGround: 0xebedee,
+  road: 0xdfe3e4,
+};
+
+/** Option A's cyan on the light grey ground. */
+export const CLAY_CYAN_GREY: SceneTheme = { ...CLAY_CYAN_LIGHT, ...LIGHT_GREY_GROUND, shadowStrength: 1 };
+
+/** The first plain Clay look (white buildings, simple lighting) on the light grey ground. */
+export const CLAY_PLAIN_GREY: SceneTheme = { ...CLAY, ...LIGHT_GREY_GROUND, node: 0xe8771a }; // orange nodes to match the orange accent
+
+/**
+ * Murshid "Day": the owner's colour scheme, copied exactly from CLAY_DAY on
+ * branch claude/admiring-johnson-oalgb6. Teal is only for the Haram; the
+ * Kaabah stays near-black; pilgrim dots are midnight (gold on teal fails contrast).
+ */
+export const CLAY_DAY: SceneTheme = {
+  ...CLAY_CYAN_LIGHT,
+  background: 0xe6ecef,
+  ground: 0xdce4ea,
+  slab: 0xe3eaef,
+  road: 0xcbd5df,
+  skyGround: 0xdce4ea,
+  sky: 0xe4ecff,
+  building: 0xc3d0e0,
+  haram: 0x5eaabd,
+  kaabah: 0x05070c,
+  node: 0x0d1424,
+  shadowStrength: 0.6,
+  // Not in the owner's Day scheme yet; the closest neutrals from it, pending the owner's choice:
+  sea: 0xe6ecef, // page background
+  rail: 0x6b7c99, // pin outline
+};
+
+/**
+ * Papercut (?look=papercut). Most colours come from src/scene/papercut.ts (the
+ * owner's colours plus labelled placeholders). Here: the map background (water,
+ * a PLACEHOLDER), the Kaabah and nodes (the owner's), and lighting chosen so
+ * flat building colours read close to the palette (values from the Papercut build).
+ */
+export const CLAY_PAPERCUT: SceneTheme = {
+  ...CLAY_DAY,
+  background: 0x2f7a7c,
+  kaabah: 0x26324d,
+  node: 0x623c00,
+  sun: 0xffffff,
+  sunIntensity: 1.57,
+  sky: 0xffffff,
+  skyGround: 0xd8c9a8,
+  skyIntensity: 1.95,
+  shadowStrength: 1,
 };

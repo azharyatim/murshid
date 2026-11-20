@@ -34,6 +34,11 @@ const PLACES: { name: string; pos: [number, number] }[] = [
 const CITY_FLIGHT_SECONDS = 3.6;
 /** The Makkah and Madinah arrows' flight between the cities (owner, 20 Nov 2026). */
 const ARROW_FLIGHT_SECONDS = 2;
+/** The same flight starting from a mosque view (closer than 10 km), which has further to climb. */
+const MOSQUE_TO_CITY_SECONDS = 3;
+/** The Masjid al-Nabawi view: camera distance, and where the Green Dome sits (fraction of the way down). */
+const NABAWI_VIEW_DISTANCE = 1500;
+const GREEN_DOME_Y = 0.42;
 /** The opening zoom-in, from twice as far out to the opening view, once the map has loaded. */
 const INTRO_SECONDS = 2.4;
 /** The Masjid al-Haram view: camera distance, and how long the zoom in takes. */
@@ -246,6 +251,10 @@ export function App() {
     };
   }, [city, cityError, regional, regionTried]);
 
+  /** Between the cities: 2 s from a city view, 3 s from a mosque view (owner, 20 Nov 2026). */
+  const betweenCitiesSeconds = () =>
+    (sceneRef.current?.debugView().distance ?? Infinity) < 10_000 ? MOSQUE_TO_CITY_SECONDS : ARROW_FLIGHT_SECONDS;
+
   const choose = (n: number | null) => {
     setSelected(n);
     setMiqatMode(false);
@@ -273,8 +282,11 @@ export function App() {
       const top = Math.max(...city.buildings.map((b) => b.h));
       sceneRef.current?.focusFacing(toScene([0, 0]), toScene(city.landmarks.towers), top, HARAM_VIEW_DISTANCE, 0.85, CLOCK_TOWER_TOP, HARAM_FLIGHT_SECONDS, easeOutQuint);
     } else if (p.id === 'nabawi') {
-      // A slower approach to the Prophet's Mosque, settling gently (owner, 20 Nov 2026).
-      sceneRef.current?.focus(sitePos(p), focusDistance(p), HARAM_FLIGHT_SECONDS, easeOutQuint);
+      // A slower approach to the Prophet's Mosque, settling gently, looking towards the
+      // Green Dome, which sits centred across the screen (owner, 20 Nov 2026).
+      const dome = greenDome(regional?.madinah ?? null);
+      if (PAPER && dome) sceneRef.current?.focusFacing(sitePos(p), dome, 20, NABAWI_VIEW_DISTANCE, 0.85, GREEN_DOME_Y, HARAM_FLIGHT_SECONDS, easeOutQuint);
+      else sceneRef.current?.focus(sitePos(p), focusDistance(p), HARAM_FLIGHT_SECONDS, easeOutQuint);
     } else {
       sceneRef.current?.focus(sitePos(p), focusDistance(p));
     }
@@ -439,7 +451,8 @@ export function App() {
             aria-label="Back to the opening view"
             onClick={() => {
               // The same slow flight as the city arrows (owner, 20 Nov 2026).
-              if (PAPER) sceneRef.current?.cityView(0, true, CITY_FLIGHT_SECONDS);
+              // From Madinah this is a flight between the cities, timed like the arrows.
+              if (PAPER) sceneRef.current?.cityView(0, true, paperStage?.nearest === 1 ? betweenCitiesSeconds() : CITY_FLIGHT_SECONDS);
               else sceneRef.current?.showAll();
               setTilted(false);
               setSheetOpen(false);
@@ -499,7 +512,7 @@ export function App() {
               style={{ visibility: 'hidden' }}
               onClick={() => {
                 // A slower, eased flight between the cities (owner, 20 Nov 2026).
-                sceneRef.current?.cityView(a.city, true, ARROW_FLIGHT_SECONDS);
+                sceneRef.current?.cityView(a.city, true, betweenCitiesSeconds());
                 setSheetOpen(false);
                 setTilted(false);
               }}

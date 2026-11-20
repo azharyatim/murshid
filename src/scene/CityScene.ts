@@ -149,8 +149,6 @@ const CITY_VIEW_DISTANCE = 23_000;
 const MID_TEX_SIZE = 3072;
 /** How much long flights climb (rho in van Wijk and Nuij; Mapbox's default is 1.42). */
 const FLY_CURVE = 1.42;
-/** Seconds for a flight between the cities (owner, 20 Nov 2026: slower). */
-const LONG_FLIGHT_SECONDS = 2;
 /** The opening view's starting turn: 30 degrees clockwise (north points up and to the right). */
 const OPENING_TURN = THREE.MathUtils.degToRad(30);
 
@@ -1220,8 +1218,8 @@ export class CityScene {
         dir1: toPos.clone().sub(target).normalize(),
       };
     }
-    // City-to-city flights take LONG_FLIGHT_SECONDS, whatever started them.
-    const time = arc ? LONG_FLIGHT_SECONDS : duration;
+    // City-to-city flights: the caller chooses the time (2 s from a city view, 3 s from a mosque view).
+    const time = duration;
     const curve = ease ?? (duration > 1 ? easeInOutCubic : easeOutCubic);
     this.flight = { fromPos, toPos, fromTarget, toTarget: target.clone(), t: 0, duration: time, ease: curve, arc };
   }

@@ -331,3 +331,8 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 - Masjid al-Haram view: the Clock Tower's spire now sits 4% above the top edge (`CLOCK_TOWER_TOP = -0.04`), so the whole scene sits higher; the owner accepted the tip going past the edge.
 - Flights between the cities take 2 s (`LONG_FLIGHT_SECONDS`, `ARROW_FLIGHT_SECONDS`).
 - Bug fixed: the loading screen's 20 s safety timer also flew the camera back to the opening view when the map had loaded normally, so about 20 s after opening the view jumped away from wherever the user was. It now does nothing once the map has reported ready (`readyRef`).
+
+## Masjid al-Nabawi view and flight times by starting view (owner, 20 Nov 2026, sixteenth round)
+
+- Tapping Masjid al-Nabawi now flies (3 s, slow finish) to a tilted view 1.5 km out (`NABAWI_VIEW_DISTANCE`, unchanged distance) looking from the mosque's centre towards the Green Dome, which sits centred across and 42% of the way down (`GREEN_DOME_Y`). The dome is on the mosque's south side, so this view also faces Makkah.
+- Flights between the cities take 2 s from a city view and 3 s from a mosque view (camera closer than 10 km; `betweenCitiesSeconds` in App.tsx). This applies to the arrows and to the reset button when it starts from Madinah.

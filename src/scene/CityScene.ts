@@ -150,7 +150,7 @@ const MID_TEX_SIZE = 3072;
 /** How much long flights climb (rho in van Wijk and Nuij; Mapbox's default is 1.42). */
 const FLY_CURVE = 1.42;
 /** Seconds for a flight between the cities (owner, 20 Nov 2026: slower). */
-const LONG_FLIGHT_SECONDS = 3;
+const LONG_FLIGHT_SECONDS = 2;
 /** The opening view's starting turn: 30 degrees clockwise (north points up and to the right). */
 const OPENING_TURN = THREE.MathUtils.degToRad(30);
 

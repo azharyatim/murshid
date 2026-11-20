@@ -33,14 +33,14 @@ const PLACES: { name: string; pos: [number, number] }[] = [
 /** How long the Makkah and Madinah arrows take to fly between the cities. */
 const CITY_FLIGHT_SECONDS = 3.6;
 /** The Makkah and Madinah arrows' flight between the cities (owner, 20 Nov 2026). */
-const ARROW_FLIGHT_SECONDS = 3;
+const ARROW_FLIGHT_SECONDS = 2;
 /** The opening zoom-in, from twice as far out to the opening view, once the map has loaded. */
 const INTRO_SECONDS = 2.4;
 /** The Masjid al-Haram view: camera distance, and how long the zoom in takes. */
 const HARAM_VIEW_DISTANCE = 2400;
 const HARAM_FLIGHT_SECONDS = 3;
 /** Where the Clock Tower's top sits in that view: this fraction of the way down the map. */
-const CLOCK_TOWER_TOP = 0.07;
+const CLOCK_TOWER_TOP = -0.04; // owner: the spire may go slightly past the top edge
 const CITY_VIEW = 60_000; // further out than this: only city names (and Badr)
 
 /** Papercut: the legend's colours (the owner's). */
@@ -153,6 +153,7 @@ export function App() {
   const makkahArrowRef = useRef<HTMLButtonElement>(null);
   // The loading screen stays until the opening view's map has been drawn.
   const [mapReady, setMapReady] = useState(false);
+  const readyRef = useRef(false);
 
   const [city, setCity] = useState<CityData | null>(null);
   const [cityError, setCityError] = useState(false);
@@ -163,6 +164,8 @@ export function App() {
   // Never leave the loading screen up for good if a download stalls.
   useEffect(() => {
     const t = setTimeout(() => {
+      // Only if the map never reported ready: otherwise this would pull the camera away.
+      if (readyRef.current) return;
       setMapReady(true);
       if (PAPER) sceneRef.current?.cityView(0, true, INTRO_SECONDS);
     }, 20_000);
@@ -227,6 +230,7 @@ export function App() {
       ]);
     }
     scene.onReady = () => {
+      readyRef.current = true;
       setMapReady(true);
       if (PAPER) scene.cityView(0, true, INTRO_SECONDS);
     };

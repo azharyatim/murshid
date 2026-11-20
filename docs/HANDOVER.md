@@ -325,3 +325,9 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 ## Opening turn (owner, 20 Nov 2026, fourteenth round)
 
 - The opening view starts at 46 km turned 30 degrees clockwise (`OPENING_TURN`; the owner said "-30 degrees", read as clockwise as in Figma's rotation field: north points up and to the right) and turns back to north-up while zooming in to 23 km. Under reduced motion it opens north-up at 23 km. `cityView` now takes a compass direction and keeps the mosque's framing for it.
+
+## Haram view higher, 2 s city flights, fallback-timer fix (owner, 20 Nov 2026, fifteenth round)
+
+- Masjid al-Haram view: the Clock Tower's spire now sits 4% above the top edge (`CLOCK_TOWER_TOP = -0.04`), so the whole scene sits higher; the owner accepted the tip going past the edge.
+- Flights between the cities take 2 s (`LONG_FLIGHT_SECONDS`, `ARROW_FLIGHT_SECONDS`).
+- Bug fixed: the loading screen's 20 s safety timer also flew the camera back to the opening view when the map had loaded normally, so about 20 s after opening the view jumped away from wherever the user was. It now does nothing once the map has reported ready (`readyRef`).

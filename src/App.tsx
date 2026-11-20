@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CityScene, type Look, type PaperStage, type Pin } from './scene/CityScene';
+import { easeOutQuint, CityScene, type Look, type PaperStage, type Pin } from './scene/CityScene';
 import {
   CLAY,
   CLAY_CYAN,
@@ -34,6 +34,9 @@ const PLACES: { name: string; pos: [number, number] }[] = [
 const CITY_FLIGHT_SECONDS = 3.6;
 /** The opening zoom-out, from twice the zoom to the opening view, once the map has loaded. */
 const INTRO_SECONDS = 2.4;
+/** The Masjid al-Haram view: camera distance, and how long the zoom in takes. */
+const HARAM_VIEW_DISTANCE = 2400;
+const HARAM_FLIGHT_SECONDS = 3;
 const CITY_VIEW = 60_000; // further out than this: only city names (and Badr)
 
 /** Papercut: the legend's colours (the owner's). */
@@ -255,7 +258,13 @@ export function App() {
       setTilted(false);
       return;
     }
-    sceneRef.current?.focus(sitePos(p), focusDistance(p));
+    if (p.id === 'haram' && PAPER && city?.landmarks.towers) {
+      // The Masjid al-Haram view (owner, 20 Nov 2026): 2.4 km out, looking towards the
+      // Clock Towers, which sit centred near the top; a slow, gentle finish.
+      sceneRef.current?.focusFacing(toScene([0, 0]), toScene(city.landmarks.towers), 300, HARAM_VIEW_DISTANCE, 0.85, 0.3, HARAM_FLIGHT_SECONDS, easeOutQuint);
+    } else {
+      sceneRef.current?.focus(sitePos(p), focusDistance(p));
+    }
     setTilted(true);
   };
 

@@ -151,6 +151,11 @@ const MID_TEX_SIZE = 3072;
 const FLY_CURVE = 1.42;
 /** Seconds for a flight between the cities (owner, 20 Nov 2026: slower). */
 const LONG_FLIGHT_SECONDS = 5;
+
+const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2);
+/** Settles very gently: most of the move early, a long slow finish. */
+export const easeOutQuint = (t: number) => 1 - Math.pow(1 - t, 5);
 const TILTED_POLAR = 1.0;
 // When the map first tilts from the default north-up view, look from the north
 // side (camera north of the Haram, facing south). From the south the Clock
@@ -187,7 +192,7 @@ interface Flight {
   t: number;
   /** Seconds the flight takes, and whether it eases in as well as out (long city-to-city flights). */
   duration: number;
-  easeInOut: boolean;
+  ease: (t: number) => number;
   /**
    * Long flights rise and come down again (owner, 20 Nov 2026), on the smooth zoom-and-pan
    * path of van Wijk and Nuij (as in web maps' "fly to"), which keeps the screen moving
@@ -1157,7 +1162,15 @@ export class CityScene {
 
   // Camera moves ------------------------------------------------------------
 
-  private flyTo(target: THREE.Vector3, distance: number, polar: number, azimuth: number, animate = true, duration = 0.6) {
+  private flyTo(
+    target: THREE.Vector3,
+    distance: number,
+    polar: number,
+    azimuth: number,
+    animate = true,
+    duration = 0.6,
+    ease: ((t: number) => number) | null = null,
+  ) {
     const d = THREE.MathUtils.clamp(distance, MIN_DISTANCE, this.controls.maxDistance);
     const p = THREE.MathUtils.clamp(polar, MIN_POLAR, MAX_POLAR);
     const toPos = new THREE.Vector3(
@@ -1203,7 +1216,8 @@ export class CityScene {
     }
     // City-to-city flights take at least LONG_FLIGHT_SECONDS, whatever started them.
     const time = arc ? Math.max(duration, LONG_FLIGHT_SECONDS) : duration;
-    this.flight = { fromPos, toPos, fromTarget, toTarget: target.clone(), t: 0, duration: time, easeInOut: duration > 1, arc };
+    const curve = ease ?? (duration > 1 ? easeInOutCubic : easeOutCubic);
+    this.flight = { fromPos, toPos, fromTarget, toTarget: target.clone(), t: 0, duration: time, ease: curve, arc };
   }
 
   /** For automated tests: the camera's distance, compass direction and tilt. */
@@ -1248,6 +1262,61 @@ export class CityScene {
   /** Move in on one point, keeping the current compass direction. */
   focus(pos: [number, number], distance = 720) {
     this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), distance, 0.75, this.tiltAzimuth());
+  }
+
+  /** Distance, tilt and compass direction of a camera position around a target. */
+  private sphericalOf(pos: THREE.Vector3, target: THREE.Vector3) {
+    const v = pos.clone().sub(target);
+    const distance = Math.max(1, v.length());
+    return { distance, polar: Math.acos(THREE.MathUtils.clamp(v.y / distance, -1, 1)), azimuth: Math.atan2(v.x, v.z) };
+  }
+
+  /**
+   * A tilted view looking from `from` towards `anchor` (both scene metres), with the anchor
+   * centred across the screen and `anchorY` of the way down it (owner, 20 Nov 2026: the
+   * Masjid al-Haram view, Clock Towers centred near the top). `anchorHeight` is the height
+   * on the anchor that is placed (e.g. halfway up a tower).
+   */
+  focusFacing(
+    from: [number, number],
+    anchor: [number, number],
+    anchorHeight: number,
+    distance: number,
+    polar: number,
+    anchorY: number,
+    duration: number,
+    ease: (t: number) => number,
+  ) {
+    const dx = anchor[0] - from[0];
+    const dz = anchor[1] - from[1];
+    // The camera stands on the far side of `from`, looking along from -> anchor.
+    const azimuth = Math.atan2(-dx, -dz);
+    const cam = this.camera.clone();
+    const anchorPt = new THREE.Vector3(anchor[0], anchorHeight, anchor[1]);
+    const place = (u: number) => {
+      const t = new THREE.Vector3(from[0] + dx * u, 0, from[1] + dz * u);
+      cam.position.set(
+        t.x + distance * Math.sin(polar) * Math.sin(azimuth),
+        distance * Math.cos(polar),
+        t.z + distance * Math.sin(polar) * Math.cos(azimuth),
+      );
+      cam.lookAt(t);
+      cam.updateMatrixWorld();
+      return t;
+    };
+    // Slide the point looked at along the line until the anchor sits at anchorY.
+    let lo = -2;
+    let hi = 2;
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      place(mid);
+      const y = (-anchorPt.clone().project(cam).y + 1) / 2; // 0 top, 1 bottom
+      // Moving the target towards the anchor brings the anchor down the screen.
+      if (y < anchorY) lo = mid;
+      else hi = mid;
+    }
+    const target = place((lo + hi) / 2);
+    this.flyTo(target, distance, polar, azimuth, true, duration, ease);
   }
 
   /** Fit a set of points (scene metres) on screen from above, north up. Used for the miqat view. */
@@ -1386,11 +1455,7 @@ export class CityScene {
     if (this.flight) {
       const f = this.flight;
       f.t = Math.min(1, f.t + dt / f.duration);
-      const e = f.easeInOut
-        ? f.t < 0.5
-          ? 4 * f.t ** 3
-          : 1 - Math.pow(-2 * f.t + 2, 3) / 2
-        : 1 - Math.pow(1 - f.t, 3);
+      const e = f.ease(f.t);
       if (f.arc) {
         // Gentle ease at both ends only (sine), so the steady middle stays steady.
         const a = f.arc;
@@ -1404,8 +1469,21 @@ export class CityScene {
         const dir = this.tmp.copy(a.dir0).lerp(a.dir1, k).normalize();
         this.camera.position.copy(this.controls.target).addScaledVector(dir, f.t >= 1 ? f.toPos.distanceTo(f.toTarget) : w / a.toWidth);
       } else {
+        // Swing around the point looked at (owner, 20 Nov 2026): distance, tilt and compass
+        // direction change smoothly, so a change of side is seen as a turn, not a jump.
         this.controls.target.lerpVectors(f.fromTarget, f.toTarget, e);
-        this.camera.position.lerpVectors(f.fromPos, f.toPos, e);
+        const a = this.sphericalOf(f.fromPos, f.fromTarget);
+        const b = this.sphericalOf(f.toPos, f.toTarget);
+        let dAz = b.azimuth - a.azimuth;
+        dAz = Math.atan2(Math.sin(dAz), Math.cos(dAz)); // the shorter way round
+        const dist = Math.exp(THREE.MathUtils.lerp(Math.log(a.distance), Math.log(b.distance), e));
+        const polar = THREE.MathUtils.lerp(a.polar, b.polar, e);
+        const az = a.azimuth + dAz * e;
+        this.camera.position.set(
+          this.controls.target.x + dist * Math.sin(polar) * Math.sin(az),
+          this.controls.target.y + dist * Math.cos(polar),
+          this.controls.target.z + dist * Math.sin(polar) * Math.cos(az),
+        );
       }
       if (f.t >= 1) this.flight = null;
       this.needsRender = true;

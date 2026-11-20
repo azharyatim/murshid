@@ -303,3 +303,9 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 
 - The first arc had a sudden zoom mid-flight (75 to 580 km in about half a second) because its climb followed the eased progress. City flights now follow the van Wijk and Nuij smooth zoom-and-pan path (as web maps' "fly to" do; curve `FLY_CURVE` 1.42), with a sine ease only at the ends, so each moment zooms by about the same amount. Peak about 590 km. City flights take at least 5 s (`LONG_FLIGHT_SECONDS`), including a reset from Madinah; short resets keep 3.6 s.
 - The bottom sheet no longer opens by itself: choosing a step, place or miqat only updates its bar, and the arrows and reset close it. Only tapping the bar opens it.
+
+## Masjid al-Haram view, turning flights (owner, 20 Nov 2026, eleventh round)
+
+- Tapping the Masjid al-Haram pin (Papercut) now flies to a view 2.4 km out (`HARAM_VIEW_DISTANCE`), tilted (0.85 rad), looking from the Kaabah's far side towards the Clock Towers, with the towers (halfway up, 300 m) centred across the screen and 30% of the way down (`focusFacing` in CityScene.ts, which solves for the point looked at). The zoom takes 3 s with an ease-out-quint curve, so it settles very slowly at the end.
+- All short camera moves now swing around the point looked at (distance on a log scale, tilt and compass direction eased, the shorter way round), so a change of side is seen as a turn instead of a jump to the other side.
+- Noted: at 2.4 km the buildings are still rising (they reach full height at 1.45 km), so the Clock Towers show at about 60% of their height. Raised with the owner.

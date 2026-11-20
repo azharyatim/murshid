@@ -181,6 +181,9 @@ interface Flight {
   fromTarget: THREE.Vector3;
   toTarget: THREE.Vector3;
   t: number;
+  /** Seconds the flight takes, and whether it eases in as well as out (long city-to-city flights). */
+  duration: number;
+  easeInOut: boolean;
 }
 
 /**
@@ -239,6 +242,10 @@ export class CityScene {
   /** Called once, when the map the opening view needs has been drawn (Papercut: its ground images). */
   onReady: (() => void) | null = null;
   private readyFired = false;
+  private settleUntil = 0;
+  private lastSharpCheck = 0;
+  /** Highest pixel density drawn (Papercut phones: 1.75, to keep the frame rate up). */
+  private ratioCap = 2;
   /** On-screen arrows pointing to places that are off screen (the Makkah and Madinah arrows). */
   private pointers: { el: HTMLElement; pos: [number, number] }[] = [];
   /**
@@ -292,7 +299,8 @@ export class CityScene {
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     // Papercut is tuned for phones: pixel ratio capped at 1.75 there, 2 on larger screens.
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, paper && small ? 1.75 : 2));
+    this.ratioCap = paper && small ? 1.75 : 2;
+    this.renderer.setPixelRatio(this.wantedRatio());
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = paper ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     if (model) {
@@ -821,6 +829,7 @@ export class CityScene {
   private markReady() {
     this.readyFired = true;
     this.needsRender = true;
+    this.settleUntil = performance.now() + 1500;
     // Let the finished frame reach the screen before the loading screen goes.
     requestAnimationFrame(() => this.onReady?.());
   }
@@ -852,7 +861,7 @@ export class CityScene {
    * Papercut's opening view of a city (owner, 20 Nov 2026): straight down, north up,
    * 23 km out, with the city's mosque centred across and two thirds of the way down the screen.
    */
-  cityView(index: 0 | 1, animate = true) {
+  cityView(index: 0 | 1, animate = true, duration = 0.6) {
     const c = this.paper?.cities[index];
     if (!c) return this.showAll(animate);
     const dist = CITY_VIEW_DISTANCE;
@@ -861,7 +870,7 @@ export class CityScene {
     const target = c.centre.clone();
     target.z -= (2 / 3 - 1 / 2) * visible;
     // Centred across the width (owner, 20 Nov 2026; this replaced a nudge east for the Jabal al-Nur label).
-    this.flyTo(target, dist, AERIAL_POLAR, 0, animate);
+    this.flyTo(target, dist, AERIAL_POLAR, 0, animate, duration);
   }
 
   /** Shows each `el` at the screen edge, pointing towards its `pos`, whenever that is off screen. */
@@ -1136,7 +1145,7 @@ export class CityScene {
 
   // Camera moves ------------------------------------------------------------
 
-  private flyTo(target: THREE.Vector3, distance: number, polar: number, azimuth: number, animate = true) {
+  private flyTo(target: THREE.Vector3, distance: number, polar: number, azimuth: number, animate = true, duration = 0.6) {
     const d = THREE.MathUtils.clamp(distance, MIN_DISTANCE, this.controls.maxDistance);
     const p = THREE.MathUtils.clamp(polar, MIN_POLAR, MAX_POLAR);
     const toPos = new THREE.Vector3(
@@ -1158,6 +1167,8 @@ export class CityScene {
       fromTarget: this.controls.target.clone(),
       toTarget: target.clone(),
       t: 0,
+      duration,
+      easeInOut: duration > 1,
     };
   }
 
@@ -1248,10 +1259,33 @@ export class CityScene {
 
   // Frame loop ----------------------------------------------------------------
 
+  private wantedRatio() {
+    return Math.min(window.devicePixelRatio || 1, this.ratioCap);
+  }
+
+  /**
+   * The canvas is drawn at its on-screen size times the screen's pixel density. Some
+   * phones (and the preview page's frame) report the final size or density only after
+   * the page has opened, which left the first picture blurry until the map was touched
+   * (owner, 20 Nov 2026). So this is checked a few times a second, not only on resize.
+   */
+  private checkSharpness() {
+    const parent = this.canvas.parentElement ?? this.canvas;
+    const pr = this.wantedRatio();
+    const w = Math.max(1, parent.clientWidth);
+    const h = Math.max(1, parent.clientHeight);
+    if (pr !== this.renderer.getPixelRatio() || this.canvas.width !== Math.floor(w * pr) || this.canvas.height !== Math.floor(h * pr)) this.resize();
+  }
+
   private resize() {
     const parent = this.canvas.parentElement ?? this.canvas;
     const w = Math.max(1, parent.clientWidth);
     const h = Math.max(1, parent.clientHeight);
+    const pr = this.wantedRatio();
+    if (pr !== this.renderer.getPixelRatio()) {
+      this.renderer.setPixelRatio(pr);
+      this.composer?.setPixelRatio(pr);
+    }
     this.renderer.setSize(w, h, false);
     this.composer?.setSize(w, h);
     this.camera.aspect = w / h;
@@ -1303,6 +1337,12 @@ export class CityScene {
     this.raf = requestAnimationFrame(this.tick);
     const dt = Math.min(0.05, (time - this.last) / 1000 || 0);
     this.last = time;
+    if (time - this.lastSharpCheck > 250) {
+      this.lastSharpCheck = time;
+      this.checkSharpness();
+    }
+    // Keep redrawing for a moment after the map is revealed, so no half-ready picture stays up.
+    if (time < this.settleUntil) this.needsRender = true;
     // Papercut: the nodes only animate (and keep the screen redrawing) while they are visible.
     if (!this.reducedMotion && (!this.paper || this.nodeMesh.visible)) {
       for (const n of this.nodes) n.angle += n.speed * dt;
@@ -1311,8 +1351,12 @@ export class CityScene {
     }
     if (this.flight) {
       const f = this.flight;
-      f.t = Math.min(1, f.t + dt / 0.6);
-      const e = 1 - Math.pow(1 - f.t, 3);
+      f.t = Math.min(1, f.t + dt / f.duration);
+      const e = f.easeInOut
+        ? f.t < 0.5
+          ? 4 * f.t ** 3
+          : 1 - Math.pow(-2 * f.t + 2, 3) / 2
+        : 1 - Math.pow(1 - f.t, 3);
       this.camera.position.lerpVectors(f.fromPos, f.toPos, e);
       this.controls.target.lerpVectors(f.fromTarget, f.toTarget, e);
       if (f.t >= 1) this.flight = null;

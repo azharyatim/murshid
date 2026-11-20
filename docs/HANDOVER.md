@@ -284,3 +284,8 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 
 - The owner found the map blurry when it first appears. Cause: most of the 23 km opening view is each city's 32 km middle ring (62.5 m data), painted at only 1536 px on phones (about 21 m per pixel, coarser than the screen), so contour edges looked soft and stepped. It is now painted at 3072 px (`MID_TEX_SIZE`, about 10 m per pixel), with its paper shadow scaled to keep the same width on the ground. Cost: about 50 MB of graphics memory per city once visited (was about 12 MB). Not yet measured on a mid-range phone.
 - The loading screen no longer waits for the 2.6 MB region image: the opening view lies inside Makkah's middle ring, so it shows once Makkah's two ground patches are painted. The patches now start loading as soon as the small `terrain-meta.json` arrives.
+
+## Blurry until touched; slower city flights (owner, 20 Nov 2026, seventh round)
+
+- On the owner's phone the whole map stayed blurry until it was touched. Likely cause: the phone (or the preview page's frame) reported its final size or pixel density only after the scene was made, and nothing re-read it until a touch redrew the map. The scene now checks the canvas against the current size and density four times a second and redraws at the right sharpness (`checkSharpness`), and keeps redrawing for 1.5 s after the loading screen lifts. Tested by changing the emulated density after load: the canvas went from 390 to 682 px wide (390 × 1.75 cap) with no touch. Not yet confirmed on the owner's phone.
+- The Makkah and Madinah arrows now fly between the cities in 2.4 s (`CITY_FLIGHT_SECONDS` in App.tsx) with an ease-in-out curve; other camera moves keep 0.6 s.

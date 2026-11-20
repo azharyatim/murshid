@@ -30,6 +30,8 @@ const PLACES: { name: string; pos: [number, number] }[] = [
 ];
 
 // With the regional map, which pins show depends on how far out the view is (metres).
+/** How long the Makkah and Madinah arrows take to fly between the cities. */
+const CITY_FLIGHT_SECONDS = 2.4;
 const CITY_VIEW = 60_000; // further out than this: only city names (and Badr)
 
 /** Papercut: the legend's colours (the owner's). */
@@ -468,7 +470,8 @@ export function App() {
               className="dir-arrow"
               style={{ visibility: 'hidden' }}
               onClick={() => {
-                sceneRef.current?.cityView(a.city);
+                // A slower, eased flight between the cities (owner, 20 Nov 2026).
+                sceneRef.current?.cityView(a.city, true, CITY_FLIGHT_SECONDS);
                 setTilted(false);
               }}
             >

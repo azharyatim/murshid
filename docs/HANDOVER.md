@@ -341,3 +341,7 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 
 - `CLOCK_TOWER_TOP` is now -0.006 (was -0.04): measured at 390 × 844 the Clock Towers label moved from 218.8 to 248.6 px, 30 px lower.
 - Then 20 px lower again (owner, same day): `CLOCK_TOWER_TOP` 0.017; label at 268.7 px.
+
+## Masjid al-Nabawi view without the turn (owner, 20 Nov 2026, eighteenth round)
+
+- Tapping Masjid al-Nabawi no longer turns the map: it keeps the current compass direction (north-up from the Madinah view) and tilts in with the Green Dome centred across, 42% of the way down. Coming from the north-up Madinah view the camera stands south of the mosque, so the dome is in front of the mosque and Makkah's arrow is at the bottom. The Masjid al-Haram view still turns to face the Clock Towers.

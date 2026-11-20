@@ -283,10 +283,17 @@ export function App() {
       const top = Math.max(...city.buildings.map((b) => b.h));
       sceneRef.current?.focusFacing(toScene([0, 0]), toScene(city.landmarks.towers), top, HARAM_VIEW_DISTANCE, 0.85, CLOCK_TOWER_TOP, HARAM_FLIGHT_SECONDS, easeOutQuint);
     } else if (p.id === 'nabawi') {
-      // A slower approach to the Prophet's Mosque, settling gently, looking towards the
-      // Green Dome, which sits centred across the screen (owner, 20 Nov 2026).
+      // A slower approach to the Prophet's Mosque, settling gently, with the Green Dome
+      // centred across the screen (owner, 20 Nov 2026).
       const dome = greenDome(regional?.madinah ?? null);
-      if (PAPER && dome) sceneRef.current?.focusFacing(sitePos(p), dome, 20, NABAWI_VIEW_DISTANCE, 0.85, GREEN_DOME_Y, HARAM_FLIGHT_SECONDS, easeOutQuint);
+      // No turn (owner, 20 Nov 2026): keep the map's current compass direction, and place the
+      // Green Dome centred across by looking at it along that direction.
+      const scene = sceneRef.current;
+      if (PAPER && dome && scene) {
+        const az = scene.debugView().azimuth;
+        const from: [number, number] = [dome[0] + Math.sin(az) * 100, dome[1] + Math.cos(az) * 100];
+        scene.focusFacing(from, dome, 20, NABAWI_VIEW_DISTANCE, 0.85, GREEN_DOME_Y, HARAM_FLIGHT_SECONDS, easeOutQuint);
+      }
       else sceneRef.current?.focus(sitePos(p), focusDistance(p), HARAM_FLIGHT_SECONDS, easeOutQuint);
     } else {
       sceneRef.current?.focus(sitePos(p), focusDistance(p));

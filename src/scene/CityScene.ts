@@ -147,6 +147,10 @@ const AERIAL_POLAR = 0.4;
 const CITY_VIEW_DISTANCE = 23_000;
 /** Texture size for each city's 32 km middle ring. */
 const MID_TEX_SIZE = 3072;
+/** How much long flights climb (rho in van Wijk and Nuij; Mapbox's default is 1.42). */
+const FLY_CURVE = 1.42;
+/** Seconds for a flight between the cities (owner, 20 Nov 2026: slower). */
+const LONG_FLIGHT_SECONDS = 5;
 const TILTED_POLAR = 1.0;
 // When the map first tilts from the default north-up view, look from the north
 // side (camera north of the Haram, facing south). From the south the Clock
@@ -185,10 +189,11 @@ interface Flight {
   duration: number;
   easeInOut: boolean;
   /**
-   * Long flights rise and come down again (owner, 20 Nov 2026): the camera climbs to
-   * `peak` metres at the halfway point, so the ground glides by at an even pace.
+   * Long flights rise and come down again (owner, 20 Nov 2026), on the smooth zoom-and-pan
+   * path of van Wijk and Nuij (as in web maps' "fly to"), which keeps the screen moving
+   * at a steady speed: no sudden zoom in the middle.
    */
-  arc: { d0: number; d1: number; peak: number; dir0: THREE.Vector3; dir1: THREE.Vector3 } | null;
+  arc: { w0: number; r0: number; S: number; d1: number; toWidth: number; dir0: THREE.Vector3; dir1: THREE.Vector3 } | null;
 }
 
 /**
@@ -1176,17 +1181,29 @@ export class CityScene {
     const d0 = fromPos.distanceTo(fromTarget);
     let arc: Flight['arc'] = null;
     if (travel > 2 * Math.max(d0, d) * tanV) {
-      // High enough at the top for the start and the end to be on screen together.
-      const peak = Math.min(this.controls.maxDistance, (travel * 1.1) / (2 * tanV));
+      // Work in visible ground height (w), which is proportional to the camera distance.
+      const toWidth = 2 * tanV;
+      const w0 = d0 * toWidth;
+      const w1 = d * toWidth;
+      const rho = FLY_CURVE;
+      const d1 = travel;
+      const b0 = (w1 * w1 - w0 * w0 + rho ** 4 * d1 * d1) / (2 * w0 * rho * rho * d1);
+      const b1 = (w1 * w1 - w0 * w0 - rho ** 4 * d1 * d1) / (2 * w1 * rho * rho * d1);
+      const r0 = Math.log(Math.sqrt(b0 * b0 + 1) - b0);
+      const r1 = Math.log(Math.sqrt(b1 * b1 + 1) - b1);
       arc = {
-        d0,
-        d1: d,
-        peak: Math.max(peak, d0, d),
+        w0,
+        r0,
+        S: (r1 - r0) / rho,
+        d1,
+        toWidth,
         dir0: fromPos.clone().sub(fromTarget).normalize(),
         dir1: toPos.clone().sub(target).normalize(),
       };
     }
-    this.flight = { fromPos, toPos, fromTarget, toTarget: target.clone(), t: 0, duration, easeInOut: duration > 1, arc };
+    // City-to-city flights take at least LONG_FLIGHT_SECONDS, whatever started them.
+    const time = arc ? Math.max(duration, LONG_FLIGHT_SECONDS) : duration;
+    this.flight = { fromPos, toPos, fromTarget, toTarget: target.clone(), t: 0, duration: time, easeInOut: duration > 1, arc };
   }
 
   /** For automated tests: the camera's distance, compass direction and tilt. */
@@ -1374,15 +1391,20 @@ export class CityScene {
           ? 4 * f.t ** 3
           : 1 - Math.pow(-2 * f.t + 2, 3) / 2
         : 1 - Math.pow(1 - f.t, 3);
-      this.controls.target.lerpVectors(f.fromTarget, f.toTarget, e);
       if (f.arc) {
-        // Distance on a log scale (zooming feels even), lifted towards the peak mid-flight.
+        // Gentle ease at both ends only (sine), so the steady middle stays steady.
         const a = f.arc;
-        const base = THREE.MathUtils.lerp(Math.log(a.d0), Math.log(a.d1), e);
-        const lift = (Math.log(a.peak) - Math.max(Math.log(a.d0), Math.log(a.d1))) * Math.sin(Math.PI * e);
-        const dir = this.tmp.copy(a.dir0).lerp(a.dir1, e).normalize();
-        this.camera.position.copy(this.controls.target).addScaledVector(dir, Math.exp(base + lift));
+        const k = (1 - Math.cos(Math.PI * f.t)) / 2;
+        const rho = FLY_CURVE;
+        const sr = rho * k * a.S + a.r0;
+        const along = ((a.w0 / (rho * rho * a.d1)) * (Math.cosh(a.r0) * Math.tanh(sr) - Math.sinh(a.r0))) * a.d1;
+        const w = (a.w0 * Math.cosh(a.r0)) / Math.cosh(sr);
+        const frac = f.t >= 1 ? 1 : along / a.d1;
+        this.controls.target.lerpVectors(f.fromTarget, f.toTarget, frac);
+        const dir = this.tmp.copy(a.dir0).lerp(a.dir1, k).normalize();
+        this.camera.position.copy(this.controls.target).addScaledVector(dir, f.t >= 1 ? f.toPos.distanceTo(f.toTarget) : w / a.toWidth);
       } else {
+        this.controls.target.lerpVectors(f.fromTarget, f.toTarget, e);
         this.camera.position.lerpVectors(f.fromPos, f.toPos, e);
       }
       if (f.t >= 1) this.flight = null;

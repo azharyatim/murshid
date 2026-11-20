@@ -129,8 +129,8 @@ const REAL_CITY = ['cyan-light', 'green', 'cyan-grey', 'clay-grey', 'day', 'pape
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);
   const [placeId, setPlaceId] = useState<string | null>(null);
-  // The bottom sheet starts collapsed (owner's request) so the map gets the room;
-  // choosing a step or a place opens it.
+  // The bottom sheet starts collapsed and stays collapsed (owner, 20 Nov 2026): choosing a
+  // step or a place only updates its bar; only tapping the bar opens it.
   const [sheetOpen, setSheetOpen] = useState(false);
   // The miqat view (from the "At the miqat" chip): the five miqats on the region map.
   const [miqatMode, setMiqatMode] = useState(false);
@@ -237,7 +237,6 @@ export function App() {
 
   const choose = (n: number | null) => {
     setSelected(n);
-    if (n !== null) setSheetOpen(true);
     setMiqatMode(false);
     setPlaceId(null);
     const step = STEPS.find((s) => s.n === n);
@@ -248,7 +247,6 @@ export function App() {
 
   const choosePlace = (p: Place) => {
     setSelected(null);
-    setSheetOpen(true);
     if (p.kind !== 'miqat') setMiqatMode(false);
     setPlaceId(p.id);
     if (p.kind === 'miqat') {
@@ -266,7 +264,6 @@ export function App() {
     if (!showRegion) return choose(MIQAT_STEPS[0].n);
     setSelected(MIQAT_STEPS[0].n);
     setPlaceId(null);
-    setSheetOpen(true);
     setMiqatMode(true);
     sceneRef.current?.frame(MIQATS.map(sitePos));
     setTilted(false);
@@ -481,6 +478,7 @@ export function App() {
               onClick={() => {
                 // A slower, eased flight between the cities (owner, 20 Nov 2026).
                 sceneRef.current?.cityView(a.city, true, CITY_FLIGHT_SECONDS);
+                setSheetOpen(false);
                 setTilted(false);
               }}
             >

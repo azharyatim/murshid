@@ -298,3 +298,8 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 ## City flights rise and descend (owner, 20 Nov 2026, ninth round)
 
 - The owner felt no slowdown on the Makkah/Madinah flights: at a steady 23 km the 340 km trip crossed about 17 screen-heights, so the middle still flashed past. Long flights (travelling more than two screen-heights) now climb so that start and end fit on screen together (about 630 km up at the halfway point for Makkah to Madinah), glide across and come down; the height moves on a log scale so zooming feels even. Short moves, like most resets, are unchanged. See `arc` in `flyTo` / `tick`.
+
+## Steady city flights; sheet stays closed (owner, 20 Nov 2026, tenth round)
+
+- The first arc had a sudden zoom mid-flight (75 to 580 km in about half a second) because its climb followed the eased progress. City flights now follow the van Wijk and Nuij smooth zoom-and-pan path (as web maps' "fly to" do; curve `FLY_CURVE` 1.42), with a sine ease only at the ends, so each moment zooms by about the same amount. Peak about 590 km. City flights take at least 5 s (`LONG_FLIGHT_SECONDS`), including a reset from Madinah; short resets keep 3.6 s.
+- The bottom sheet no longer opens by itself: choosing a step, place or miqat only updates its bar, and the arrows and reset close it. Only tapping the bar opens it.

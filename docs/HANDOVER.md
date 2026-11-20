@@ -289,3 +289,8 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 
 - On the owner's phone the whole map stayed blurry until it was touched. Likely cause: the phone (or the preview page's frame) reported its final size or pixel density only after the scene was made, and nothing re-read it until a touch redrew the map. The scene now checks the canvas against the current size and density four times a second and redraws at the right sharpness (`checkSharpness`), and keeps redrawing for 1.5 s after the loading screen lifts. Tested by changing the emulated density after load: the canvas went from 390 to 682 px wide (390 × 1.75 cap) with no touch. Not yet confirmed on the owner's phone.
 - The Makkah and Madinah arrows now fly between the cities in 2.4 s (`CITY_FLIGHT_SECONDS` in App.tsx) with an ease-in-out curve; other camera moves keep 0.6 s.
+
+## Slower flights and the opening zoom-out (owner, 20 Nov 2026, eighth round)
+
+- City arrows and the reset button now fly in 3.6 s (`CITY_FLIGHT_SECONDS`), eased in and out.
+- The page opens at twice the zoom (11.5 km, same framing) behind the loading screen, and once the map is ready it zooms out to the 23 km opening view in 2.4 s (`INTRO_SECONDS`). "Double the zoom" was read as twice as close, like the "1.7x" zoom readout in the owner's nuzul-atlas reference. Under reduced motion it simply opens at 23 km.

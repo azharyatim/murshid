@@ -457,7 +457,8 @@ export class CityScene {
 
     this.setTheme(theme);
     this.resize();
-    if (this.paper) this.cityView(0, false);
+    // Papercut opens at twice the zoom; App flies it back to the opening view once the map is ready.
+    if (this.paper) this.cityView(0, false, 0, this.reducedMotion ? 1 : 2);
     else this.showAll(false);
     if (!this.paper) this.markReady();
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -861,10 +862,11 @@ export class CityScene {
    * Papercut's opening view of a city (owner, 20 Nov 2026): straight down, north up,
    * 23 km out, with the city's mosque centred across and two thirds of the way down the screen.
    */
-  cityView(index: 0 | 1, animate = true, duration = 0.6) {
+  cityView(index: 0 | 1, animate = true, duration = 0.6, zoom = 1) {
     const c = this.paper?.cities[index];
     if (!c) return this.showAll(animate);
-    const dist = CITY_VIEW_DISTANCE;
+    // zoom 2 = twice as close (the page opens there, then settles back; owner, 20 Nov 2026).
+    const dist = CITY_VIEW_DISTANCE / zoom;
     const visible = 2 * dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
     // The screen's centre is north of the mosque by a sixth of the visible height.
     const target = c.centre.clone();

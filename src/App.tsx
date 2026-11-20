@@ -31,7 +31,9 @@ const PLACES: { name: string; pos: [number, number] }[] = [
 
 // With the regional map, which pins show depends on how far out the view is (metres).
 /** How long the Makkah and Madinah arrows take to fly between the cities. */
-const CITY_FLIGHT_SECONDS = 2.4;
+const CITY_FLIGHT_SECONDS = 3.6;
+/** The opening zoom-out, from twice the zoom to the opening view, once the map has loaded. */
+const INTRO_SECONDS = 2.4;
 const CITY_VIEW = 60_000; // further out than this: only city names (and Badr)
 
 /** Papercut: the legend's colours (the owner's). */
@@ -153,7 +155,10 @@ export function App() {
 
   // Never leave the loading screen up for good if a download stalls.
   useEffect(() => {
-    const t = setTimeout(() => setMapReady(true), 20_000);
+    const t = setTimeout(() => {
+      setMapReady(true);
+      if (PAPER) sceneRef.current?.cityView(0, true, INTRO_SECONDS);
+    }, 20_000);
     return () => clearTimeout(t);
   }, []);
 
@@ -214,7 +219,10 @@ export function App() {
         { el: makkahArrowRef.current, pos: at('haram') },
       ]);
     }
-    scene.onReady = () => setMapReady(true);
+    scene.onReady = () => {
+      setMapReady(true);
+      if (PAPER) scene.cityView(0, true, INTRO_SECONDS);
+    };
     sceneRef.current = scene;
     // Test builds only: lets automated tests read the camera. Not in the preview or the app.
     if (import.meta.env.DEV) (window as unknown as { __scene: CityScene }).__scene = scene;
@@ -411,7 +419,8 @@ export function App() {
             type="button"
             aria-label="Back to the opening view"
             onClick={() => {
-              if (PAPER) sceneRef.current?.cityView(0);
+              // The same slow flight as the city arrows (owner, 20 Nov 2026).
+              if (PAPER) sceneRef.current?.cityView(0, true, CITY_FLIGHT_SECONDS);
               else sceneRef.current?.showAll();
               setTilted(false);
               setSheetOpen(false);

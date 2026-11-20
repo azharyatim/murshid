@@ -831,7 +831,7 @@ export class CityScene {
 
   /**
    * Papercut's opening view of a city (owner, 20 Nov 2026): straight down, north up,
-   * 23 km out, with the city's mosque two thirds of the way down the screen.
+   * 23 km out, with the city's mosque centred across and two thirds of the way down the screen.
    */
   cityView(index: 0 | 1, animate = true) {
     const c = this.paper?.cities[index];
@@ -841,9 +841,7 @@ export class CityScene {
     // The screen's centre is north of the mosque by a sixth of the visible height.
     const target = c.centre.clone();
     target.z -= (2 / 3 - 1 / 2) * visible;
-    // And a little east (12% of the screen width), so the start of the Jabal al-Nur
-    // label shows at the right edge on a 390px-wide phone, as the owner asked.
-    target.x += 0.12 * visible * this.camera.aspect;
+    // Centred across the width (owner, 20 Nov 2026; this replaced a nudge east for the Jabal al-Nur label).
     this.flyTo(target, dist, AERIAL_POLAR, 0, animate);
   }
 

@@ -412,6 +412,7 @@ export function App() {
               if (PAPER) sceneRef.current?.cityView(0);
               else sceneRef.current?.showAll();
               setTilted(false);
+              setSheetOpen(false);
             }}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.3-5.2M19 4v4h-4" /></svg>

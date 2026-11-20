@@ -270,3 +270,8 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 
 - A matching **Makkah arrow** points to Masjid al-Haram whenever it is off screen; tapping it goes to the opening view. Each arrow hides while its own city is on screen, so at the opening view only "Madinah" shows, and over Madinah only "Makkah". See `setPointers` in `CityScene.ts`.
 - The **circular-arrow button** (above 2D/3D) now resets to the opening view instead of rotating the map 45°. Rotating is now by two-finger twist only.
+
+## Centred city views; reset closes the sheet (owner, 20 Nov 2026, fourth round)
+
+- The opening view and the Madinah view now centre the mosque's dot across the screen width (measured: 195 px of 390 for both). This removed the nudge east, so the Jabal al-Nur label no longer shows at 390 px; only its dot sits at the right edge. Raised with the owner.
+- The reset button also collapses the bottom sheet.

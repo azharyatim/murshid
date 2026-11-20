@@ -151,6 +151,8 @@ const MID_TEX_SIZE = 3072;
 const FLY_CURVE = 1.42;
 /** Seconds for a flight between the cities (owner, 20 Nov 2026: slower). */
 const LONG_FLIGHT_SECONDS = 3;
+/** The opening view's starting turn: 30 degrees clockwise (north points up and to the right). */
+const OPENING_TURN = THREE.MathUtils.degToRad(30);
 
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -473,7 +475,8 @@ export class CityScene {
     this.setTheme(theme);
     this.resize();
     // Papercut opens twice as far out (46 km); App brings it in to the opening view once the map is ready.
-    if (this.paper) this.cityView(0, false, 0, this.reducedMotion ? 1 : 0.5);
+    // It also starts turned 30 degrees clockwise (owner, 20 Nov 2026) and turns back to north-up on the way in.
+    if (this.paper) this.cityView(0, false, 0, this.reducedMotion ? 1 : 0.5, this.reducedMotion ? 0 : OPENING_TURN);
     else this.showAll(false);
     if (!this.paper) this.markReady();
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -876,7 +879,7 @@ export class CityScene {
    * Papercut's opening view of a city (owner, 20 Nov 2026): straight down, north up,
    * 23 km out, with the city's mosque centred across and two thirds of the way down the screen.
    */
-  cityView(index: 0 | 1, animate = true, duration = 0.6, zoom = 1) {
+  cityView(index: 0 | 1, animate = true, duration = 0.6, zoom = 1, azimuth = 0) {
     const c = this.paper?.cities[index];
     if (!c) return this.showAll(animate);
     // zoom 0.5 = twice as far (the page opens there, then zooms in; owner, 20 Nov 2026).
@@ -885,10 +888,12 @@ export class CityScene {
     // Makkah: the Haram two thirds of the way down. Madinah: the Prophet's Mosque slightly
     // above the middle (owner, 20 Nov 2026).
     const down = index === 0 ? 2 / 3 : 0.42;
+    // Move the point looked at towards the top of the screen, whichever way the map is turned.
     const target = c.centre.clone();
-    target.z -= (down - 1 / 2) * visible;
+    target.x -= Math.sin(azimuth) * (down - 1 / 2) * visible;
+    target.z -= Math.cos(azimuth) * (down - 1 / 2) * visible;
     // Centred across the width (owner, 20 Nov 2026; this replaced a nudge east for the Jabal al-Nur label).
-    this.flyTo(target, dist, AERIAL_POLAR, 0, animate, duration);
+    this.flyTo(target, dist, AERIAL_POLAR, azimuth, animate, duration);
   }
 
   /** Shows each `el` at the screen edge, pointing towards its `pos`, whenever that is off screen. */

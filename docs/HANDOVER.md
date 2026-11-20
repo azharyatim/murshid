@@ -321,3 +321,7 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 - Tapping Masjid al-Nabawi: 3 s with the slow-finish curve (as for the Haram), turning as it goes.
 - Opening: the page now waits at 46 km (twice as far out) and zooms in to 23 km in 2.4 s. At 46 km the view reaches past Makkah's 32 km ring, so the loading screen again waits for the region image too.
 - The flight between the cities (arrows, or reset from Madinah) is 3 s (`LONG_FLIGHT_SECONDS`).
+
+## Opening turn (owner, 20 Nov 2026, fourteenth round)
+
+- The opening view starts at 46 km turned 30 degrees clockwise (`OPENING_TURN`; the owner said "-30 degrees", read as clockwise as in Figma's rotation field: north points up and to the right) and turns back to north-up while zooming in to 23 km. Under reduced motion it opens north-up at 23 km. `cityView` now takes a compass direction and keeps the mosque's framing for it.

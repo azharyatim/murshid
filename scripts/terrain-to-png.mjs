@@ -11,6 +11,8 @@ const files = {
   region: [meta.region.nx, meta.region.nz],
   makkah: [meta.makkah.n, meta.makkah.n],
   madinah: [meta.madinah.n, meta.madinah.n],
+  'makkah-mid': [meta.makkahMid.n, meta.makkahMid.n],
+  'madinah-mid': [meta.madinahMid.n, meta.madinahMid.n],
 };
 
 const CRC = new Int32Array(256).map((_, n) => {

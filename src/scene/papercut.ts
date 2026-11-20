@@ -60,6 +60,8 @@ export const PAPER_TYPE_COLOUR: Record<string, string> = {
 // this prototype's real buildings cover about 1.8 km (900 m around the mosque),
 // so every distance is about 1.2 times larger.
 export const PAPER_STAGES = {
+  midStart: 170_000, // middle ring (32 km, 62.5 m cells) starts to fade in
+  midFull: 70_000,
   patchStart: 84_000, // sharper ground patch starts to fade in
   patchFull: 26_000,
   footStart: 36_000, // flat footprints start to fade in

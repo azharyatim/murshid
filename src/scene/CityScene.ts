@@ -63,9 +63,25 @@ interface PaperCity {
   /** Null for a city that has no 3D buildings yet (Madinah, until stage B). */
   grow: THREE.Group | null;
   buildingMat: THREE.MeshLambertMaterial | null;
-  patch: THREE.Mesh;
-  patchMat: THREE.MeshBasicMaterial;
+  /** Ground patches, sharpest last: the middle ring (32 km), then the city patch (8 km). */
+  patches: PaperPatch[];
   shadowPlane: THREE.Mesh;
+}
+
+/** One ground patch laid over the region map, fading in as the camera comes closer. */
+interface PaperPatch {
+  /** Baked file and meta key, e.g. 'makkah-mid' / 'makkahMid'. */
+  file: string;
+  metaKey: string;
+  /** Half the patch's width in metres. */
+  half: number;
+  /** Camera distance where it starts to fade in, and where it is fully shown. */
+  start: number;
+  full: number;
+  /** Width of the cut-paper shadow, in texture pixels. */
+  shadow: number;
+  mesh: THREE.Mesh;
+  mat: THREE.MeshBasicMaterial;
   painted: boolean;
 }
 
@@ -194,7 +210,7 @@ export class CityScene {
   /** The Papercut look (?look=papercut). Null for every other look. */
   private paper: {
     cities: PaperCity[];
-    meta: { region: TerrainGrid; makkah: { x: number; z: number; half: number; n: number }; madinah: { x: number; z: number; half: number; n: number } } | null;
+    meta: ({ region: TerrainGrid } & Record<string, { x: number; z: number; half: number; n: number }>) | null;
     texSize: number;
     /** 0..1: how far the nearest city's buildings have risen. */
     growth: number;
@@ -568,13 +584,23 @@ export class CityScene {
       lastReport: 0,
     };
     const make = (c: CityData, key: 'makkah' | 'madinah', root: THREE.Group, withBuildings: boolean) => {
-      const patchMat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: 0, toneMapped: false });
-      const patch = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000), patchMat);
-      patch.rotation.x = -Math.PI / 2;
-      patch.renderOrder = 1;
-      patch.visible = false;
-      root.add(patch);
-      this.flatLayers.push({ obj: patch, level: 1 });
+      const S = PAPER_STAGES;
+      // The middle ring sits under the sharp city patch; both fade in as the camera nears.
+      const patches = (
+        [
+          { file: `${key}-mid`, metaKey: `${key}Mid`, half: 16000, start: S.midStart, full: S.midFull, shadow: 3, order: 0.5, level: 0.5 },
+          { file: key, metaKey: key, half: 4000, start: S.patchStart, full: S.patchFull, shadow: 5, order: 1, level: 1 },
+        ] as const
+      ).map((d) => {
+        const mat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: 0, toneMapped: false });
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(d.half * 2, d.half * 2), mat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.renderOrder = d.order;
+        mesh.visible = false;
+        root.add(mesh);
+        this.flatLayers.push({ obj: mesh, level: d.level });
+        return { file: d.file, metaKey: d.metaKey, half: d.half, start: d.start, full: d.full, shadow: d.shadow, mesh, mat, painted: false };
+      });
       // Shadow-only plane: the ground stays its exact colours, buildings still cast soft shadows.
       const shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600), new THREE.ShadowMaterial({ opacity: 0 }));
       shadowPlane.rotation.x = -Math.PI / 2;
@@ -617,7 +643,7 @@ export class CityScene {
         }
       }
       const centre = new THREE.Vector3(...this.cityOffset(c));
-      this.paper!.cities.push({ centre, terrainKey: key, grow, buildingMat, patch, patchMat, shadowPlane, painted: false });
+      this.paper!.cities.push({ centre, terrainKey: key, grow, buildingMat, patches, shadowPlane });
     };
     make(makkah, 'makkah', this.makkah, true);
     if (madinah) {
@@ -666,19 +692,20 @@ export class CityScene {
     return tex;
   }
 
-  /** Paints a city's sharper ground patch (25 m cells) the first time the camera gets near it. */
-  private async ensurePatch(c: PaperCity) {
+  /** Paints one ground patch of a city the first time the camera gets near it. */
+  private async ensurePatch(c: PaperCity, pt: PaperPatch) {
     const p = this.paper!;
-    if (c.painted || !p.meta) return;
-    c.painted = true;
-    const heights = await loadTerrain(`${import.meta.env.BASE_URL}data/terrain-${c.terrainKey}.png`);
-    const m = p.meta[c.terrainKey];
+    const m = p.meta?.[pt.metaKey];
+    if (pt.painted || !m) return;
+    pt.painted = true;
+    const heights = await loadTerrain(`${import.meta.env.BASE_URL}data/terrain-${pt.file}.png`);
     const grid: TerrainGrid = { x: m.x - m.half, z: m.z - m.half, w: m.half * 2, h: m.half * 2, nx: m.n, nz: m.n };
     const size = Math.min(p.texSize, this.renderer.capabilities.maxTextureSize);
-    const world = { x0: c.centre.x - 4000, x1: c.centre.x + 4000, z0: c.centre.z - 4000, z1: c.centre.z + 4000 };
-    const cv = await paintPaper(heights, grid, world, size, size, 5, true);
-    c.patchMat.map = this.paperTexture(cv);
-    c.patchMat.needsUpdate = true;
+    const h = pt.half;
+    const world = { x0: c.centre.x - h, x1: c.centre.x + h, z0: c.centre.z - h, z1: c.centre.z + h };
+    const cv = await paintPaper(heights, grid, world, size, size, pt.shadow, true);
+    pt.mat.map = this.paperTexture(cv);
+    pt.mat.needsUpdate = true;
     this.needsRender = true;
   }
 
@@ -702,10 +729,12 @@ export class CityScene {
       }
       c.shadowPlane.visible = g > 0.02;
       (c.shadowPlane.material as THREE.ShadowMaterial).opacity = 0.3 * g;
-      const pa = smoothstep(S.patchStart, S.patchFull, d[i]);
-      c.patchMat.opacity = c.patchMat.map ? pa : 0;
-      c.patch.visible = pa > 0.01 && Boolean(c.patchMat.map);
-      if (d[i] < S.patchStart * 1.2) void this.ensurePatch(c);
+      for (const pt of c.patches) {
+        const pa = smoothstep(pt.start, pt.full, d[i]);
+        pt.mat.opacity = pt.mat.map ? pa : 0;
+        pt.mesh.visible = pa > 0.01 && Boolean(pt.mat.map);
+        if (d[i] < pt.start * 1.2) void this.ensurePatch(c, pt);
+      }
       if (i === 0) p.growth = g; // nodes and step pins belong to Makkah
       if (i === nearest) p.foot = f;
     });

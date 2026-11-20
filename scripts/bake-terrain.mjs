@@ -35,6 +35,9 @@ const unproject = (x, z) => ({ lat: unmerc(-z / (R * K) + merc(KAABAH.lat)), lon
 const REGION = { lat0: 20.0, lat1: 25.0, lon0: 38.0, lon1: 41.0 }; // whole degrees = whole tiles
 const RW = 2112, RH = 3840; // region raster size (cells of about 145 m)
 const PATCH_HALF = 4000, PN = 320; // city patch: 8 km square, 25 m cells
+// Middle ring (owner's request, 20 Nov 2026): 32 km square, 62.5 m cells, so views of
+// about 10 to 40 km stay crisp between the sharp city patch and the 145 m region map.
+const MID_HALF = 16000, MN = 512;
 
 // --- paper layers: height above local valley floor (m) where each layer starts.
 // Layer 4 of 12 (sage green) is the lowest; the app's palette has teal below it.
@@ -164,7 +167,7 @@ for (let j = 0; j < RH; j++) for (let i = 0; i < RW; i++) {
 writeFileSync('public/data/terrain-region.bin', regionT);
 
 // --- city patches: 30 m heights, lightly blurred, same relief rule ---
-function patch(name, c) {
+function patch(name, c, PATCH_HALF = 4000, PN = 320) {
   const [cx, cz] = project(c.lat, c.lon);
   const cell = (PATCH_HALF * 2) / PN;
   const H = new Float32Array(PN * PN);
@@ -172,8 +175,8 @@ function patch(name, c) {
     const p = unproject(cx - PATCH_HALF + (i + 0.5) * cell, cz - PATCH_HALF + (j + 0.5) * cell);
     H[j * PN + i] = elev(p.lat, p.lon);
   }
-  // Remove buildings: lowest height within about 150 m, then smooth.
-  const S = boxBlur(minFilter(H, PN, PN, 6), PN, PN, 2, 2);
+  // Remove buildings: lowest height within about 150 m, then smooth (the same in metres at either cell size).
+  const S = boxBlur(minFilter(H, PN, PN, Math.max(1, Math.round(150 / cell))), PN, PN, Math.max(1, Math.round(50 / cell)), 2);
   const out = new Uint8Array(PN * PN);
   let minR = 1e9, maxR = 0;
   for (let j = 0; j < PN; j++) for (let i = 0; i < PN; i++) {
@@ -194,6 +197,8 @@ const meta = {
   region: { x: rx0, z: rz0, w: rx1 - rx0, h: rz1 - rz0, nx: RW, nz: RH, latlon: REGION },
   makkah: patch('makkah', KAABAH),
   madinah: patch('madinah', NABAWI),
+  makkahMid: patch('makkah-mid', KAABAH, MID_HALF, MN),
+  madinahMid: patch('madinah-mid', NABAWI, MID_HALF, MN),
 };
 writeFileSync('public/data/terrain-meta.json', JSON.stringify(meta, null, 1));
 console.log('done');

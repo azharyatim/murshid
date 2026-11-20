@@ -95,8 +95,8 @@ function distanceText(p: Place) {
 // Add ?look=model or ?look=cyan to the address to see the mockups.
 // ?look=cyan-light and ?look=cyan-flat are two ways of keeping the cyan from turning teal.
 // A build can choose the look that opens by default with VITE_DEFAULT_LOOK (used for preview pages).
-// The owner's Day colour scheme is the default; the older looks remain for comparison only.
-const LOOK_PARAM = new URLSearchParams(window.location.search).get('look') ?? import.meta.env.VITE_DEFAULT_LOOK ?? 'day';
+// Papercut is the default (owner, 20 Nov 2026); ?look=day and the older looks remain for comparison.
+const LOOK_PARAM = new URLSearchParams(window.location.search).get('look') ?? import.meta.env.VITE_DEFAULT_LOOK ?? 'papercut';
 const THEMES = {
   plain: CLAY,
   model: CLAY_MODEL,

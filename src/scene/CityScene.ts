@@ -184,6 +184,11 @@ interface Flight {
   /** Seconds the flight takes, and whether it eases in as well as out (long city-to-city flights). */
   duration: number;
   easeInOut: boolean;
+  /**
+   * Long flights rise and come down again (owner, 20 Nov 2026): the camera climbs to
+   * `peak` metres at the halfway point, so the ground glides by at an even pace.
+   */
+  arc: { d0: number; d1: number; peak: number; dir0: THREE.Vector3; dir1: THREE.Vector3 } | null;
 }
 
 /**
@@ -1163,15 +1168,25 @@ export class CityScene {
       this.needsRender = true;
       return;
     }
-    this.flight = {
-      fromPos: this.camera.position.clone(),
-      toPos,
-      fromTarget: this.controls.target.clone(),
-      toTarget: target.clone(),
-      t: 0,
-      duration,
-      easeInOut: duration > 1,
-    };
+    const fromTarget = this.controls.target.clone();
+    const fromPos = this.camera.position.clone();
+    // How far the point looked at travels, against how much ground the screen shows.
+    const travel = Math.hypot(target.x - fromTarget.x, target.z - fromTarget.z);
+    const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const d0 = fromPos.distanceTo(fromTarget);
+    let arc: Flight['arc'] = null;
+    if (travel > 2 * Math.max(d0, d) * tanV) {
+      // High enough at the top for the start and the end to be on screen together.
+      const peak = Math.min(this.controls.maxDistance, (travel * 1.1) / (2 * tanV));
+      arc = {
+        d0,
+        d1: d,
+        peak: Math.max(peak, d0, d),
+        dir0: fromPos.clone().sub(fromTarget).normalize(),
+        dir1: toPos.clone().sub(target).normalize(),
+      };
+    }
+    this.flight = { fromPos, toPos, fromTarget, toTarget: target.clone(), t: 0, duration, easeInOut: duration > 1, arc };
   }
 
   /** For automated tests: the camera's distance, compass direction and tilt. */
@@ -1359,8 +1374,17 @@ export class CityScene {
           ? 4 * f.t ** 3
           : 1 - Math.pow(-2 * f.t + 2, 3) / 2
         : 1 - Math.pow(1 - f.t, 3);
-      this.camera.position.lerpVectors(f.fromPos, f.toPos, e);
       this.controls.target.lerpVectors(f.fromTarget, f.toTarget, e);
+      if (f.arc) {
+        // Distance on a log scale (zooming feels even), lifted towards the peak mid-flight.
+        const a = f.arc;
+        const base = THREE.MathUtils.lerp(Math.log(a.d0), Math.log(a.d1), e);
+        const lift = (Math.log(a.peak) - Math.max(Math.log(a.d0), Math.log(a.d1))) * Math.sin(Math.PI * e);
+        const dir = this.tmp.copy(a.dir0).lerp(a.dir1, e).normalize();
+        this.camera.position.copy(this.controls.target).addScaledVector(dir, Math.exp(base + lift));
+      } else {
+        this.camera.position.lerpVectors(f.fromPos, f.toPos, e);
+      }
       if (f.t >= 1) this.flight = null;
       this.needsRender = true;
     }

@@ -294,3 +294,7 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 
 - City arrows and the reset button now fly in 3.6 s (`CITY_FLIGHT_SECONDS`), eased in and out.
 - The page opens at twice the zoom (11.5 km, same framing) behind the loading screen, and once the map is ready it zooms out to the 23 km opening view in 2.4 s (`INTRO_SECONDS`). "Double the zoom" was read as twice as close, like the "1.7x" zoom readout in the owner's nuzul-atlas reference. Under reduced motion it simply opens at 23 km.
+
+## City flights rise and descend (owner, 20 Nov 2026, ninth round)
+
+- The owner felt no slowdown on the Makkah/Madinah flights: at a steady 23 km the 340 km trip crossed about 17 screen-heights, so the middle still flashed past. Long flights (travelling more than two screen-heights) now climb so that start and end fit on screen together (about 630 km up at the halfway point for Makkah to Madinah), glide across and come down; the height moves on a log scale so zooming feels even. Short moves, like most resets, are unchanged. See `arc` in `flyTo` / `tick`.

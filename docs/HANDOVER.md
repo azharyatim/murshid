@@ -340,3 +340,4 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 ## Haram view 30 px lower (owner, 20 Nov 2026, seventeenth round)
 
 - `CLOCK_TOWER_TOP` is now -0.006 (was -0.04): measured at 390 × 844 the Clock Towers label moved from 218.8 to 248.6 px, 30 px lower.
+- Then 20 px lower again (owner, same day): `CLOCK_TOWER_TOP` 0.017; label at 268.7 px.

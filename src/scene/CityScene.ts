@@ -235,8 +235,8 @@ export class CityScene {
   /** Called once, when the map the opening view needs has been drawn (Papercut: its ground images). */
   onReady: (() => void) | null = null;
   private readyFired = false;
-  /** An on-screen arrow pointing to a place that is off screen (the Madinah arrow). */
-  private pointer: { el: HTMLElement; pos: [number, number] } | null = null;
+  /** On-screen arrows pointing to places that are off screen (the Makkah and Madinah arrows). */
+  private pointers: { el: HTMLElement; pos: [number, number] }[] = [];
   /**
    * Flat layers lying on the ground (sea, streets, road lines), each lifted a
    * little more than the one below. The lift grows with viewing distance: far
@@ -847,15 +847,13 @@ export class CityScene {
     this.flyTo(target, dist, AERIAL_POLAR, 0, animate);
   }
 
-  /** Shows `el` at the screen edge, pointing towards `pos`, whenever `pos` is off screen. */
-  setPointer(el: HTMLElement | null, pos: [number, number]) {
-    this.pointer = el ? { el, pos } : null;
+  /** Shows each `el` at the screen edge, pointing towards its `pos`, whenever that is off screen. */
+  setPointers(pointers: { el: HTMLElement | null; pos: [number, number] }[]) {
+    this.pointers = pointers.filter((p): p is { el: HTMLElement; pos: [number, number] } => Boolean(p.el));
     this.needsRender = true;
   }
 
-  private updatePointer(w: number, h: number) {
-    const ptr = this.pointer;
-    if (!ptr) return;
+  private updatePointer(ptr: { el: HTMLElement; pos: [number, number] }, w: number, h: number) {
     const v = this.tmp.set(ptr.pos[0], 0, ptr.pos[1]).project(this.camera);
     const onScreen = v.z < 1 && Math.abs(v.x) < 0.9 && Math.abs(v.y) < 0.9;
     if (onScreen) {
@@ -1267,7 +1265,7 @@ export class CityScene {
       const y = (-this.tmp.y * 0.5 + 0.5) * h;
       pin.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
     }
-    this.updatePointer(w, h);
+    for (const ptr of this.pointers) this.updatePointer(ptr, w, h);
   }
 
   /** Marks pins that a building stands in front of, so they can be drawn faded. */

@@ -139,6 +139,7 @@ export function App() {
   const sceneRef = useRef<CityScene | null>(null);
   const pinEls = useRef(new Map<string, HTMLElement>());
   const madinahArrowRef = useRef<HTMLButtonElement>(null);
+  const makkahArrowRef = useRef<HTMLButtonElement>(null);
   // The loading screen stays until the opening view's map has been drawn.
   const [mapReady, setMapReady] = useState(false);
 
@@ -205,8 +206,11 @@ export function App() {
     }
     scene.setPins(pins);
     if (PAPER && regionNow?.madinah) {
-      const nabawi = SITES.find((s) => s.id === 'nabawi')!;
-      scene.setPointer(madinahArrowRef.current, sitePos(nabawi));
+      const at = (id: string) => sitePos(SITES.find((s) => s.id === id)!);
+      scene.setPointers([
+        { el: madinahArrowRef.current, pos: at('nabawi') },
+        { el: makkahArrowRef.current, pos: at('haram') },
+      ]);
     }
     scene.onReady = () => setMapReady(true);
     sceneRef.current = scene;
@@ -400,7 +404,16 @@ export function App() {
         </div>
 
         <div className="map-controls" role="group" aria-label="Map controls">
-          <button type="button" aria-label="Rotate the map" onClick={() => sceneRef.current?.rotateBy(Math.PI / 4)}>
+          {/* Resets to the opening view (owner, 20 Nov 2026); it used to rotate the map. */}
+          <button
+            type="button"
+            aria-label="Back to the opening view"
+            onClick={() => {
+              if (PAPER) sceneRef.current?.cityView(0);
+              else sceneRef.current?.showAll();
+              setTilted(false);
+            }}
+          >
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.3-5.2M19 4v4h-4" /></svg>
           </button>
           <button
@@ -438,25 +451,37 @@ export function App() {
           </div>
         )}
 
-        {PAPER && regional?.madinah && (
-          // Points to Madinah from wherever the map is, while Madinah is off screen.
-          <button
-            ref={madinahArrowRef}
-            type="button"
-            className="dir-arrow"
-            style={{ visibility: 'hidden' }}
-            onClick={() => sceneRef.current?.jumpTo(1)}
-          >
-            <span className="dir-arrow-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M21 12 4 4.5l4.2 7.5L4 19.5Z" />
-              </svg>
-            </span>
-            <span className="dir-arrow-label">
-              <span className="sr-only">Go to </span>Madinah
-            </span>
-          </button>
-        )}
+        {PAPER &&
+          regional?.madinah &&
+          // Each arrow points to its city from wherever the map is, while that city is off screen.
+          (
+            [
+              { name: 'Madinah', ref: madinahArrowRef, city: 1 },
+              { name: 'Makkah', ref: makkahArrowRef, city: 0 },
+            ] as const
+          ).map((a) => (
+            <button
+              key={a.name}
+              ref={a.ref}
+              type="button"
+              className="dir-arrow"
+              style={{ visibility: 'hidden' }}
+              onClick={() => {
+                sceneRef.current?.cityView(a.city);
+                setTilted(false);
+              }}
+            >
+              <span className="dir-arrow-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M21 12 4 4.5l4.2 7.5L4 19.5Z" />
+                </svg>
+              </span>
+              <span className="dir-arrow-label">
+                <span className="sr-only">Go to </span>
+                {a.name}
+              </span>
+            </button>
+          ))}
 
         {!mapReady && (
           <div className="map-loading" role="status">

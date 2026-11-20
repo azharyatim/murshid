@@ -265,3 +265,8 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 - **Removed:** the "1 2 At the miqat, before Makkah" chip, the Region button, and the zoom in / zoom out buttons. Rotate and 2D/3D remain.
 - Because the chip was the only way into the miqat view, the step 1 and 2 buttons in the bottom sheet now open it.
 - **Accessibility gap:** without the zoom and Region buttons, zooming needs a pinch, so keyboard users cannot zoom. To be solved before stage 6 (offline, accessibility).
+
+## Makkah arrow and reset button (owner, 20 Nov 2026, third round)
+
+- A matching **Makkah arrow** points to Masjid al-Haram whenever it is off screen; tapping it goes to the opening view. Each arrow hides while its own city is on screen, so at the opening view only "Madinah" shows, and over Madinah only "Makkah". See `setPointers` in `CityScene.ts`.
+- The **circular-arrow button** (above 2D/3D) now resets to the opening view instead of rotating the map 45°. Rotating is now by two-finger twist only.

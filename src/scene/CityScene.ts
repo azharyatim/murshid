@@ -150,7 +150,7 @@ const MID_TEX_SIZE = 3072;
 /** How much long flights climb (rho in van Wijk and Nuij; Mapbox's default is 1.42). */
 const FLY_CURVE = 1.42;
 /** Seconds for a flight between the cities (owner, 20 Nov 2026: slower). */
-const LONG_FLIGHT_SECONDS = 5;
+const LONG_FLIGHT_SECONDS = 3;
 
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -472,8 +472,8 @@ export class CityScene {
 
     this.setTheme(theme);
     this.resize();
-    // Papercut opens at twice the zoom; App flies it back to the opening view once the map is ready.
-    if (this.paper) this.cityView(0, false, 0, this.reducedMotion ? 1 : 2);
+    // Papercut opens twice as far out (46 km); App brings it in to the opening view once the map is ready.
+    if (this.paper) this.cityView(0, false, 0, this.reducedMotion ? 1 : 0.5);
     else this.showAll(false);
     if (!this.paper) this.markReady();
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -836,10 +836,9 @@ export class CityScene {
       p.legend.style.opacity = a.toFixed(2);
       p.legend.style.visibility = a > 0.04 ? 'visible' : 'hidden';
     }
-    // Ready once every ground patch this view asked for is painted. The opening view sits
-    // inside Makkah's 32 km ring, so it does not wait for the large region image
-    // (unless that finished, or failed, first).
-    if (!this.readyFired && p.pending === 0 && (p.started > 0 || p.regionDone)) this.markReady();
+    // Ready once the region image (the 46 km start reaches past Makkah's 32 km ring) and
+    // every ground patch this view asked for are painted (or failed).
+    if (!this.readyFired && p.pending === 0 && p.regionDone) this.markReady();
   }
 
   private markReady() {
@@ -880,12 +879,14 @@ export class CityScene {
   cityView(index: 0 | 1, animate = true, duration = 0.6, zoom = 1) {
     const c = this.paper?.cities[index];
     if (!c) return this.showAll(animate);
-    // zoom 2 = twice as close (the page opens there, then settles back; owner, 20 Nov 2026).
+    // zoom 0.5 = twice as far (the page opens there, then zooms in; owner, 20 Nov 2026).
     const dist = CITY_VIEW_DISTANCE / zoom;
     const visible = 2 * dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
-    // The screen's centre is north of the mosque by a sixth of the visible height.
+    // Makkah: the Haram two thirds of the way down. Madinah: the Prophet's Mosque slightly
+    // above the middle (owner, 20 Nov 2026).
+    const down = index === 0 ? 2 / 3 : 0.42;
     const target = c.centre.clone();
-    target.z -= (2 / 3 - 1 / 2) * visible;
+    target.z -= (down - 1 / 2) * visible;
     // Centred across the width (owner, 20 Nov 2026; this replaced a nudge east for the Jabal al-Nur label).
     this.flyTo(target, dist, AERIAL_POLAR, 0, animate, duration);
   }
@@ -1214,8 +1215,8 @@ export class CityScene {
         dir1: toPos.clone().sub(target).normalize(),
       };
     }
-    // City-to-city flights take at least LONG_FLIGHT_SECONDS, whatever started them.
-    const time = arc ? Math.max(duration, LONG_FLIGHT_SECONDS) : duration;
+    // City-to-city flights take LONG_FLIGHT_SECONDS, whatever started them.
+    const time = arc ? LONG_FLIGHT_SECONDS : duration;
     const curve = ease ?? (duration > 1 ? easeInOutCubic : easeOutCubic);
     this.flight = { fromPos, toPos, fromTarget, toTarget: target.clone(), t: 0, duration: time, ease: curve, arc };
   }
@@ -1260,8 +1261,8 @@ export class CityScene {
   }
 
   /** Move in on one point, keeping the current compass direction. */
-  focus(pos: [number, number], distance = 720) {
-    this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), distance, 0.75, this.tiltAzimuth());
+  focus(pos: [number, number], distance = 720, duration = 0.6, ease: ((t: number) => number) | null = null) {
+    this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), distance, 0.75, this.tiltAzimuth(), true, duration, ease);
   }
 
   /** Distance, tilt and compass direction of a camera position around a target. */

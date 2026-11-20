@@ -32,7 +32,9 @@ const PLACES: { name: string; pos: [number, number] }[] = [
 // With the regional map, which pins show depends on how far out the view is (metres).
 /** How long the Makkah and Madinah arrows take to fly between the cities. */
 const CITY_FLIGHT_SECONDS = 3.6;
-/** The opening zoom-out, from twice the zoom to the opening view, once the map has loaded. */
+/** The Makkah and Madinah arrows' flight between the cities (owner, 20 Nov 2026). */
+const ARROW_FLIGHT_SECONDS = 3;
+/** The opening zoom-in, from twice as far out to the opening view, once the map has loaded. */
 const INTRO_SECONDS = 2.4;
 /** The Masjid al-Haram view: camera distance, and how long the zoom in takes. */
 const HARAM_VIEW_DISTANCE = 2400;
@@ -266,6 +268,9 @@ export function App() {
       // The top of the tallest building (the Clock Tower's spire) sits just below the top edge.
       const top = Math.max(...city.buildings.map((b) => b.h));
       sceneRef.current?.focusFacing(toScene([0, 0]), toScene(city.landmarks.towers), top, HARAM_VIEW_DISTANCE, 0.85, CLOCK_TOWER_TOP, HARAM_FLIGHT_SECONDS, easeOutQuint);
+    } else if (p.id === 'nabawi') {
+      // A slower approach to the Prophet's Mosque, settling gently (owner, 20 Nov 2026).
+      sceneRef.current?.focus(sitePos(p), focusDistance(p), HARAM_FLIGHT_SECONDS, easeOutQuint);
     } else {
       sceneRef.current?.focus(sitePos(p), focusDistance(p));
     }
@@ -490,7 +495,7 @@ export function App() {
               style={{ visibility: 'hidden' }}
               onClick={() => {
                 // A slower, eased flight between the cities (owner, 20 Nov 2026).
-                sceneRef.current?.cityView(a.city, true, CITY_FLIGHT_SECONDS);
+                sceneRef.current?.cityView(a.city, true, ARROW_FLIGHT_SECONDS);
                 setSheetOpen(false);
                 setTilted(false);
               }}

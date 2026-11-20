@@ -314,3 +314,10 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 
 - Buildings now rise between 4.8 and 2.5 km (`PAPER_STAGES.growStart` / `growEnd`; were 3.5 and 1.45 km), so they are at full height in the 2.4 km Masjid al-Haram view. Because the street pins and Green Dome label follow `growStart`, they now appear from 4.8 km.
 - The Masjid al-Haram view now places the top of the tallest building (the Clock Tower's spire) 7% of the way down the map (`CLOCK_TOWER_TOP`), still centred across.
+
+## Madinah framing and timings (owner, 20 Nov 2026, thirteenth round)
+
+- Madinah view (arrow): the Prophet's Mosque sits 42% of the way down the map (slightly above the middle), centred across. Makkah stays at two thirds.
+- Tapping Masjid al-Nabawi: 3 s with the slow-finish curve (as for the Haram), turning as it goes.
+- Opening: the page now waits at 46 km (twice as far out) and zooms in to 23 km in 2.4 s. At 46 km the view reaches past Makkah's 32 km ring, so the loading screen again waits for the region image too.
+- The flight between the cities (arrows, or reset from Madinah) is 3 s (`LONG_FLIGHT_SECONDS`).

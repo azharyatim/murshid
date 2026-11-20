@@ -143,6 +143,8 @@ const REGION_BOUNDS = { minX: -120_000, maxX: 100_000, minZ: -210_000, maxZ: 290
 const MIN_POLAR = 0.02; // straight down
 const MAX_POLAR = 1.3; // close to the horizon
 const AERIAL_POLAR = 0.4;
+/** Papercut's opening view: camera 23 km from the ground (owner, 20 Nov 2026). */
+const CITY_VIEW_DISTANCE = 23_000;
 const TILTED_POLAR = 1.0;
 // When the map first tilts from the default north-up view, look from the north
 // side (camera north of the Haram, facing south). From the south the Clock
@@ -224,9 +226,17 @@ export class CityScene {
     frameStart: number;
     fps: number | null;
     lastReport: number;
+    /** Loading: ground images still being painted, and whether the region map is in. */
+    pending: number;
+    regionDone: boolean;
   } | null = null;
   /** Papercut: called a few times a second with the zoom stage, for the jump buttons and the readout. */
   onPaperStage: ((s: PaperStage) => void) | null = null;
+  /** Called once, when the map the opening view needs has been drawn (Papercut: its ground images). */
+  onReady: (() => void) | null = null;
+  private readyFired = false;
+  /** An on-screen arrow pointing to a place that is off screen (the Madinah arrow). */
+  private pointer: { el: HTMLElement; pos: [number, number] } | null = null;
   /**
    * Flat layers lying on the ground (sea, streets, road lines), each lifted a
    * little more than the one below. The lift grows with viewing distance: far
@@ -435,7 +445,9 @@ export class CityScene {
 
     this.setTheme(theme);
     this.resize();
-    this.showAll(false);
+    if (this.paper) this.cityView(0, false);
+    else this.showAll(false);
+    if (!this.paper) this.markReady();
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas.parentElement ?? canvas);
     this.raf = requestAnimationFrame(this.tick);
@@ -582,6 +594,8 @@ export class CityScene {
       frameStart: 0,
       fps: null,
       lastReport: 0,
+      pending: 0,
+      regionDone: false,
     };
     const make = (c: CityData, key: 'makkah' | 'madinah', root: THREE.Group, withBuildings: boolean) => {
       const S = PAPER_STAGES;
@@ -678,6 +692,7 @@ export class CityScene {
     } catch (e) {
       console.error('Could not load the terrain', e);
     }
+    p.regionDone = true;
   }
 
   private paperTexture(cv: HTMLCanvasElement) {
@@ -698,6 +713,18 @@ export class CityScene {
     const m = p.meta?.[pt.metaKey];
     if (pt.painted || !m) return;
     pt.painted = true;
+    p.pending++;
+    try {
+      await this.paintPatch(c, pt, m);
+    } catch (e) {
+      console.error('Could not load a ground patch', e);
+    }
+    p.pending--;
+    this.needsRender = true;
+  }
+
+  private async paintPatch(c: PaperCity, pt: PaperPatch, m: { x: number; z: number; half: number; n: number }) {
+    const p = this.paper!;
     const heights = await loadTerrain(`${import.meta.env.BASE_URL}data/terrain-${pt.file}.png`);
     const grid: TerrainGrid = { x: m.x - m.half, z: m.z - m.half, w: m.half * 2, h: m.half * 2, nx: m.n, nz: m.n };
     const size = Math.min(p.texSize, this.renderer.capabilities.maxTextureSize);
@@ -768,6 +795,15 @@ export class CityScene {
       p.legend.style.opacity = a.toFixed(2);
       p.legend.style.visibility = a > 0.04 ? 'visible' : 'hidden';
     }
+    // Ready once the region map is in and every ground patch this view asked for is painted.
+    if (!this.readyFired && p.regionDone && p.pending === 0) this.markReady();
+  }
+
+  private markReady() {
+    this.readyFired = true;
+    this.needsRender = true;
+    // Let the finished frame reach the screen before the loading screen goes.
+    requestAnimationFrame(() => this.onReady?.());
   }
 
   /**
@@ -790,8 +826,68 @@ export class CityScene {
   /** Papercut: jump to the region, or into a city's 3D view (0 = Makkah, 1 = Madinah). */
   jumpTo(target: 'region' | 0 | 1) {
     if (!this.paper || target === 'region') return this.showAll();
-    const c = this.paper.cities[target];
-    if (c) this.flyTo(c.centre.clone(), 1100, 0.85, this.tiltAzimuth());
+    this.cityView(target);
+  }
+
+  /**
+   * Papercut's opening view of a city (owner, 20 Nov 2026): straight down, north up,
+   * 23 km out, with the city's mosque two thirds of the way down the screen.
+   */
+  cityView(index: 0 | 1, animate = true) {
+    const c = this.paper?.cities[index];
+    if (!c) return this.showAll(animate);
+    const dist = CITY_VIEW_DISTANCE;
+    const visible = 2 * dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    // The screen's centre is north of the mosque by a sixth of the visible height.
+    const target = c.centre.clone();
+    target.z -= (2 / 3 - 1 / 2) * visible;
+    // And a little east (12% of the screen width), so the start of the Jabal al-Nur
+    // label shows at the right edge on a 390px-wide phone, as the owner asked.
+    target.x += 0.12 * visible * this.camera.aspect;
+    this.flyTo(target, dist, AERIAL_POLAR, 0, animate);
+  }
+
+  /** Shows `el` at the screen edge, pointing towards `pos`, whenever `pos` is off screen. */
+  setPointer(el: HTMLElement | null, pos: [number, number]) {
+    this.pointer = el ? { el, pos } : null;
+    this.needsRender = true;
+  }
+
+  private updatePointer(w: number, h: number) {
+    const ptr = this.pointer;
+    if (!ptr) return;
+    const v = this.tmp.set(ptr.pos[0], 0, ptr.pos[1]).project(this.camera);
+    const onScreen = v.z < 1 && Math.abs(v.x) < 0.9 && Math.abs(v.y) < 0.9;
+    if (onScreen) {
+      ptr.el.style.visibility = 'hidden';
+      return;
+    }
+    // Screen direction: from the point looked at (the screen centre) towards a point a
+    // little way along the ground to the target. Works when the map is tilted too.
+    const t = this.controls.target;
+    const dx = ptr.pos[0] - t.x;
+    const dz = ptr.pos[1] - t.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const step = this.distance() * 0.05;
+    const a = this.tmp.set(t.x + (dx / len) * step, 0, t.z + (dz / len) * step).project(this.camera);
+    let sx = a.x * w * 0.5;
+    let sy = -a.y * h * 0.5;
+    const n = Math.hypot(sx, sy) || 1;
+    sx /= n;
+    sy /= n;
+    // Keep clear of the miqat chip (top), the map buttons (right) and the bottom-left buttons.
+    const box = { left: 70, right: w - 70, top: 84, bottom: h - 120 };
+    const cx = w / 2;
+    const cy = h / 2;
+    const k = Math.min(
+      sx > 0 ? (box.right - cx) / sx : sx < 0 ? (box.left - cx) / sx : Infinity,
+      sy > 0 ? (box.bottom - cy) / sy : sy < 0 ? (box.top - cy) / sy : Infinity,
+    );
+    const x = cx + sx * k;
+    const y = cy + sy * k;
+    ptr.el.style.visibility = 'visible';
+    ptr.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+    ptr.el.style.setProperty('--angle', `${Math.atan2(sy, sx).toFixed(3)}rad`);
   }
 
   /** Papercut: the colour legend, shown as the buildings rise. */
@@ -1170,6 +1266,7 @@ export class CityScene {
       const y = (-this.tmp.y * 0.5 + 0.5) * h;
       pin.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
     }
+    this.updatePointer(w, h);
   }
 
   /** Marks pins that a building stands in front of, so they can be drawn faded. */

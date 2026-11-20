@@ -138,12 +138,21 @@ export function App() {
   const [paperStage, setPaperStage] = useState<PaperStage | null>(null);
   const sceneRef = useRef<CityScene | null>(null);
   const pinEls = useRef(new Map<string, HTMLElement>());
+  const madinahArrowRef = useRef<HTMLButtonElement>(null);
+  // The loading screen stays until the opening view's map has been drawn.
+  const [mapReady, setMapReady] = useState(false);
 
   const [city, setCity] = useState<CityData | null>(null);
   const [cityError, setCityError] = useState(false);
   // The regional map and Madinah. If they fail to load, the app falls back to Makkah alone.
   const [regional, setRegional] = useState<{ region: RegionData; madinah: CityData | null } | null>(null);
   const [regionTried, setRegionTried] = useState(false);
+
+  // Never leave the loading screen up for good if a download stalls.
+  useEffect(() => {
+    const t = setTimeout(() => setMapReady(true), 20_000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (!REAL_CITY) return;
@@ -195,6 +204,11 @@ export function App() {
       });
     }
     scene.setPins(pins);
+    if (PAPER && regionNow?.madinah) {
+      const nabawi = SITES.find((s) => s.id === 'nabawi')!;
+      scene.setPointer(madinahArrowRef.current, sitePos(nabawi));
+    }
+    scene.onReady = () => setMapReady(true);
     sceneRef.current = scene;
     // Test builds only: lets automated tests read the camera. Not in the preview or the app.
     if (import.meta.env.DEV) (window as unknown as { __scene: CityScene }).__scene = scene;
@@ -436,17 +450,17 @@ export function App() {
               {keyOpen ? 'Hide key' : 'Key'}
             </button>
           </div>
+          {/* The Makkah and Madinah buttons were removed (owner, 20 Nov 2026); the Madinah arrow replaces them. */}
           <div className="paper-jump" role="group" aria-label="Jump to">
-            {(['region', 0, 1] as const).map((t) => {
-              const name = t === 'region' ? 'Region' : t === 0 ? 'Makkah' : 'Madinah';
-              // The current place: the nearest city once within 60 km, otherwise the region.
-              const on = paperStage ? (paperStage.cityDistance > CITY_VIEW ? t === 'region' : t === paperStage.nearest) : t === 'region';
+            {(() => {
+              // On when zoomed out beyond either city (more than 60 km).
+              const on = paperStage ? paperStage.cityDistance > CITY_VIEW : false;
               return (
-                <button key={name} type="button" className={on ? 'is-on' : ''} aria-pressed={on} onClick={() => sceneRef.current?.jumpTo(t)}>
-                  {name}
+                <button type="button" className={on ? 'is-on' : ''} aria-pressed={on} onClick={() => sceneRef.current?.jumpTo('region')}>
+                  Region
                 </button>
               );
-            })}
+            })()}
           </div>
           {paperStage && (
             // TEMPORARY, for the owner's reference while tuning: zoom distance, stage and frame rate.
@@ -454,6 +468,37 @@ export function App() {
               {formatDistance(paperStage.distance)} · {paperStage.level} · {paperStage.fps === null ? 'still' : `${paperStage.fps} fps`}
             </p>
           )}
+          </div>
+        )}
+
+        {PAPER && regional?.madinah && (
+          // Points to Madinah from wherever the map is, while Madinah is off screen.
+          <button
+            ref={madinahArrowRef}
+            type="button"
+            className="dir-arrow"
+            style={{ visibility: 'hidden' }}
+            onClick={() => sceneRef.current?.jumpTo(1)}
+          >
+            <span className="dir-arrow-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M5 12h13M13 6l6 6-6 6" />
+              </svg>
+            </span>
+            <span>
+              <span className="sr-only">Go to </span>Madinah
+            </span>
+          </button>
+        )}
+
+        {!mapReady && (
+          <div className="map-loading" role="status">
+            <div className="map-loading-paper" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </div>
+            <p>Loading the map</p>
           </div>
         )}
 

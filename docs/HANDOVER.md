@@ -250,3 +250,11 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 3. Try the map download once.
 4. Tell the owner, briefly, where things stand and ask the three open questions.
 5. Do not start stage 2 or change the default look until they answer.
+
+## Opening view, Madinah arrow, loading screen (owner, 20 Nov 2026)
+
+- **Opening view (Papercut):** straight down, north up, 23 km out, with Masjid al-Haram two thirds of the way down the map area and the view nudged east (12% of the screen width) so the start of the Jabal al-Nur label ("Jaba") shows at the right edge on a 390px phone. Wider or narrower phones show more or less of it. See `cityView` and `CITY_VIEW_DISTANCE` in `src/scene/CityScene.ts`. "Show all" and the Region button still go to the two-city region view.
+- **Makkah and Madinah jump buttons removed.** Only Region remains in that group.
+- **Madinah arrow:** a pill with an arrow and "Madinah", held at the screen edge and turned towards the Prophet's Mosque while it is off screen (it follows rotation and tilt). Tapping it flies to the same 23 km framing over Madinah. Its own choice, not specified by the owner. There is no matching arrow back to Makkah yet (open question). See `setPointer` / `updatePointer` and `.dir-arrow`.
+- **Loading screen:** three paper layers in the owner's ground colours 1 to 3, lifting in turn, with "Loading the map". It stays until the opening view's ground images are painted (`onReady`), or 20 s at most. Still under reduced motion.
+- Known: from 23 km over Madinah, the edge of the sharp 8 km ground patch shows as a faint straight line north of the mosque.

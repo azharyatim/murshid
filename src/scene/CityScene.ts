@@ -875,8 +875,9 @@ export class CityScene {
     const n = Math.hypot(sx, sy) || 1;
     sx /= n;
     sy /= n;
-    // Keep clear of the miqat chip (top), the map buttons (right) and the bottom-left buttons.
-    const box = { left: 70, right: w - 70, top: 84, bottom: h - 120 };
+    // The arrow's point, kept inside the screen: room for its label (below and to the
+    // right), clear of the map buttons (right) and the key and notice (bottom).
+    const box = { left: 28, right: w - 96, top: 40, bottom: h - 140 };
     const cx = w / 2;
     const cy = h / 2;
     const k = Math.min(

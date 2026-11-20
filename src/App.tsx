@@ -247,7 +247,7 @@ export function App() {
     setTilted(true);
   };
 
-  /** The "At the miqat" chip: steps 1 and 2, and (with the regional map) the five miqats framed. */
+  /** Steps 1 and 2 (from the sheet): and (with the regional map) the five miqats framed. */
   const openMiqats = () => {
     if (!showRegion) return choose(MIQAT_STEPS[0].n);
     setSelected(MIQAT_STEPS[0].n);
@@ -399,28 +399,7 @@ export function App() {
           ))}
         </div>
 
-        <button
-          type="button"
-          className={`miqat${MIQAT_STEPS.some((s) => s.n === selected) ? ' is-on' : ''}`}
-          onClick={openMiqats}
-        >
-          <span className="miqat-nums" aria-hidden="true">
-            {MIQAT_STEPS.map((s) => (
-              <i key={s.n}>{s.n}</i>
-            ))}
-          </span>
-          <span>
-            <span className="sr-only">Steps 1 and 2: </span>At the miqat, before Makkah
-          </span>
-        </button>
-
         <div className="map-controls" role="group" aria-label="Map controls">
-          <button type="button" aria-label="Zoom in" onClick={() => sceneRef.current?.zoomBy(0.7)}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-          </button>
-          <button type="button" aria-label="Zoom out" onClick={() => sceneRef.current?.zoomBy(1 / 0.7)}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /></svg>
-          </button>
           <button type="button" aria-label="Rotate the map" onClick={() => sceneRef.current?.rotateBy(Math.PI / 4)}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.3-5.2M19 4v4h-4" /></svg>
           </button>
@@ -450,18 +429,6 @@ export function App() {
               {keyOpen ? 'Hide key' : 'Key'}
             </button>
           </div>
-          {/* The Makkah and Madinah buttons were removed (owner, 20 Nov 2026); the Madinah arrow replaces them. */}
-          <div className="paper-jump" role="group" aria-label="Jump to">
-            {(() => {
-              // On when zoomed out beyond either city (more than 60 km).
-              const on = paperStage ? paperStage.cityDistance > CITY_VIEW : false;
-              return (
-                <button type="button" className={on ? 'is-on' : ''} aria-pressed={on} onClick={() => sceneRef.current?.jumpTo('region')}>
-                  Region
-                </button>
-              );
-            })()}
-          </div>
           {paperStage && (
             // TEMPORARY, for the owner's reference while tuning: zoom distance, stage and frame rate.
             <p className="paper-readout" aria-live="off">
@@ -482,10 +449,10 @@ export function App() {
           >
             <span className="dir-arrow-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24">
-                <path d="M5 12h13M13 6l6 6-6 6" />
+                <path d="M21 12 4 4.5l4.2 7.5L4 19.5Z" />
               </svg>
             </span>
-            <span>
+            <span className="dir-arrow-label">
               <span className="sr-only">Go to </span>Madinah
             </span>
           </button>
@@ -578,7 +545,8 @@ export function App() {
                   className={selected === s.n ? 'is-on' : ''}
                   aria-label={`Step ${s.n}: ${s.title}`}
                   aria-pressed={selected === s.n}
-                  onClick={() => choose(s.n)}
+                  // The "At the miqat" chip was removed (owner, 20 Nov 2026), so steps 1 and 2 open the miqat view.
+                  onClick={() => (MIQAT_STEPS.some((m) => m.n === s.n) ? openMiqats() : choose(s.n))}
                 >
                   {s.n}
                 </button>

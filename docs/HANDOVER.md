@@ -258,3 +258,10 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 - **Madinah arrow:** a pill with an arrow and "Madinah", held at the screen edge and turned towards the Prophet's Mosque while it is off screen (it follows rotation and tilt). Tapping it flies to the same 23 km framing over Madinah. Its own choice, not specified by the owner. There is no matching arrow back to Makkah yet (open question). See `setPointer` / `updatePointer` and `.dir-arrow`.
 - **Loading screen:** three paper layers in the owner's ground colours 1 to 3, lifting in turn, with "Loading the map". It stays until the opening view's ground images are painted (`onReady`), or 20 s at most. Still under reduced motion.
 - Known: from 23 km over Madinah, the edge of the sharp 8 km ground patch shows as a faint straight line north of the mosque.
+
+## Cleaner map (owner, 20 Nov 2026, second round)
+
+- **Madinah arrow restyled** after the Masjid al-Aqsa marker on nuzul-atlas.app (owner's screenshot): a small accent-gold arrowhead, no pill, with "Madinah" in bold gold below it and a light halo for legibility. The whole thing is a 44px touch target.
+- **Removed:** the "1 2 At the miqat, before Makkah" chip, the Region button, and the zoom in / zoom out buttons. Rotate and 2D/3D remain.
+- Because the chip was the only way into the miqat view, the step 1 and 2 buttons in the bottom sheet now open it.
+- **Accessibility gap:** without the zoom and Region buttons, zooming needs a pinch, so keyboard users cannot zoom. To be solved before stage 6 (offline, accessibility).

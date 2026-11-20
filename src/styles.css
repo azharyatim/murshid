@@ -691,6 +691,38 @@ h1 {
   translate: -50% -50%;
 }
 
+/* Floating (owner, 20 Nov 2026): a sine-wave bob, 3px either side of rest (6px travel),
+   one full cycle every 2.4s, along the direction the arrow points (vertical if it has none).
+   --bob is registered so it can be animated while --angle keeps changing with the map. */
+@property --bob {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+.dir-arrow-bob {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--angle, 90deg)) translateX(var(--bob)) rotate(calc(-1 * var(--angle, 90deg)));
+  /* Half a cycle each way; this curve is the ease-in-out-sine, so the motion is a true sine wave. */
+  animation: dir-bob 1.2s cubic-bezier(0.37, 0, 0.63, 1) infinite alternate;
+}
+
+@keyframes dir-bob {
+  from {
+    --bob: -3px;
+  }
+  to {
+    --bob: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dir-arrow-bob {
+    animation: none;
+  }
+}
+
 .dir-arrow-icon {
   position: absolute;
   inset: 0;

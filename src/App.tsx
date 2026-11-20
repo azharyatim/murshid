@@ -472,14 +472,17 @@ export function App() {
                 setTilted(false);
               }}
             >
-              <span className="dir-arrow-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M21 12 4 4.5l4.2 7.5L4 19.5Z" />
-                </svg>
-              </span>
-              <span className="dir-arrow-label">
-                <span className="sr-only">Go to </span>
-                {a.name}
+              {/* Floats: the arrow and its name bob gently along the arrow's direction. */}
+              <span className="dir-arrow-bob">
+                <span className="dir-arrow-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M21 12 4 4.5l4.2 7.5L4 19.5Z" />
+                  </svg>
+                </span>
+                <span className="dir-arrow-label">
+                  <span className="sr-only">Go to </span>
+                  {a.name}
+                </span>
               </span>
             </button>
           ))}

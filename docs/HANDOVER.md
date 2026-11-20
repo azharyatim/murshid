@@ -275,3 +275,7 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 
 - The opening view and the Madinah view now centre the mosque's dot across the screen width (measured: 195 px of 390 for both). This removed the nudge east, so the Jabal al-Nur label no longer shows at 390 px; only its dot sits at the right edge. Raised with the owner.
 - The reset button also collapses the bottom sheet.
+
+## Floating arrows (owner, 20 Nov 2026, fifth round)
+
+- The Makkah and Madinah arrows (arrowhead and name together) bob in a sine wave: 3 px either side of rest, a full cycle every 2.4 s, looping, along the direction the arrow points. Still when the device asks for reduced motion. CSS only (`.dir-arrow-bob`, `@property --bob`), so it costs no 3D redraws. Measured in Chromium: 6 px travel, none under reduced motion.

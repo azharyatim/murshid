@@ -145,6 +145,8 @@ const MAX_POLAR = 1.3; // close to the horizon
 const AERIAL_POLAR = 0.4;
 /** Papercut's opening view: camera 23 km from the ground (owner, 20 Nov 2026). */
 const CITY_VIEW_DISTANCE = 23_000;
+/** Texture size for each city's 32 km middle ring. */
+const MID_TEX_SIZE = 3072;
 const TILTED_POLAR = 1.0;
 // When the map first tilts from the default north-up view, look from the north
 // side (camera north of the Haram, facing south). From the south the Clock
@@ -228,6 +230,8 @@ export class CityScene {
     lastReport: number;
     /** Loading: ground images still being painted, and whether the region map is in. */
     pending: number;
+    /** Ground patches asked for so far. */
+    started: number;
     regionDone: boolean;
   } | null = null;
   /** Papercut: called a few times a second with the zoom stage, for the jump buttons and the readout. */
@@ -595,6 +599,7 @@ export class CityScene {
       fps: null,
       lastReport: 0,
       pending: 0,
+      started: 0,
       regionDone: false,
     };
     const make = (c: CityData, key: 'makkah' | 'madinah', root: THREE.Group, withBuildings: boolean) => {
@@ -674,8 +679,13 @@ export class CityScene {
     const p = this.paper!;
     const url = (f: string) => `${import.meta.env.BASE_URL}data/${f}`;
     try {
-      const [meta, heights] = await Promise.all([fetch(url('terrain-meta.json')).then((r) => r.json()), loadTerrain(url('terrain-region.png'))]);
+      const heightsLoad = loadTerrain(url('terrain-region.png'));
+      // The small meta file first: with it, the city's own ground patches can start
+      // loading while the large region image is still on its way.
+      const meta = await fetch(url('terrain-meta.json')).then((r) => r.json());
       p.meta = meta;
+      this.needsRender = true;
+      const heights = await heightsLoad;
       const rect = worldRect(meta.region.latlon ?? TERRAIN_REGION_LATLON);
       const max = this.renderer.capabilities.maxTextureSize;
       const th = Math.min(meta.region.nz, max);
@@ -713,6 +723,7 @@ export class CityScene {
     const m = p.meta?.[pt.metaKey];
     if (pt.painted || !m) return;
     pt.painted = true;
+    p.started++;
     p.pending++;
     try {
       await this.paintPatch(c, pt, m);
@@ -727,10 +738,16 @@ export class CityScene {
     const p = this.paper!;
     const heights = await loadTerrain(`${import.meta.env.BASE_URL}data/terrain-${pt.file}.png`);
     const grid: TerrainGrid = { x: m.x - m.half, z: m.z - m.half, w: m.half * 2, h: m.half * 2, nx: m.n, nz: m.n };
-    const size = Math.min(p.texSize, this.renderer.capabilities.maxTextureSize);
+    // The middle ring fills most of the opening 23 km view, so it gets a finer image:
+    // 3072 px over 32 km (about 10 m per pixel, finer than the screen shows it), where
+    // 1536 px left its contour edges soft and stepped (owner, 20 Nov 2026).
+    const want = pt.half > 4000 ? MID_TEX_SIZE : p.texSize;
+    const size = Math.min(want, this.renderer.capabilities.maxTextureSize);
+    // Keep the paper's drop shadow the same width on the ground at the larger size.
+    const shadow = Math.max(1, Math.round((pt.shadow * size) / p.texSize));
     const h = pt.half;
     const world = { x0: c.centre.x - h, x1: c.centre.x + h, z0: c.centre.z - h, z1: c.centre.z + h };
-    const cv = await paintPaper(heights, grid, world, size, size, pt.shadow, true);
+    const cv = await paintPaper(heights, grid, world, size, size, shadow, true);
     pt.mat.map = this.paperTexture(cv);
     pt.mat.needsUpdate = true;
     this.needsRender = true;
@@ -795,8 +812,10 @@ export class CityScene {
       p.legend.style.opacity = a.toFixed(2);
       p.legend.style.visibility = a > 0.04 ? 'visible' : 'hidden';
     }
-    // Ready once the region map is in and every ground patch this view asked for is painted.
-    if (!this.readyFired && p.regionDone && p.pending === 0) this.markReady();
+    // Ready once every ground patch this view asked for is painted. The opening view sits
+    // inside Makkah's 32 km ring, so it does not wait for the large region image
+    // (unless that finished, or failed, first).
+    if (!this.readyFired && p.pending === 0 && (p.started > 0 || p.regionDone)) this.markReady();
   }
 
   private markReady() {

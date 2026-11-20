@@ -279,3 +279,8 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 ## Floating arrows (owner, 20 Nov 2026, fifth round)
 
 - The Makkah and Madinah arrows (arrowhead and name together) bob in a sine wave: 3 px either side of rest, a full cycle every 2.4 s, looping, along the direction the arrow points. Still when the device asks for reduced motion. CSS only (`.dir-arrow-bob`, `@property --bob`), so it costs no 3D redraws. Measured in Chromium: 6 px travel, none under reduced motion.
+
+## Sharper opening map (owner, 20 Nov 2026, sixth round)
+
+- The owner found the map blurry when it first appears. Cause: most of the 23 km opening view is each city's 32 km middle ring (62.5 m data), painted at only 1536 px on phones (about 21 m per pixel, coarser than the screen), so contour edges looked soft and stepped. It is now painted at 3072 px (`MID_TEX_SIZE`, about 10 m per pixel), with its paper shadow scaled to keep the same width on the ground. Cost: about 50 MB of graphics memory per city once visited (was about 12 MB). Not yet measured on a mid-range phone.
+- The loading screen no longer waits for the 2.6 MB region image: the opening view lies inside Makkah's middle ring, so it shows once Makkah's two ground patches are painted. The patches now start loading as soon as the small `terrain-meta.json` arrives.

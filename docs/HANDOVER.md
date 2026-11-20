@@ -336,3 +336,7 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 
 - Tapping Masjid al-Nabawi now flies (3 s, slow finish) to a tilted view 1.5 km out (`NABAWI_VIEW_DISTANCE`, unchanged distance) looking from the mosque's centre towards the Green Dome, which sits centred across and 42% of the way down (`GREEN_DOME_Y`). The dome is on the mosque's south side, so this view also faces Makkah.
 - Flights between the cities take 2 s from a city view and 3 s from a mosque view (camera closer than 10 km; `betweenCitiesSeconds` in App.tsx). This applies to the arrows and to the reset button when it starts from Madinah.
+
+## Haram view 30 px lower (owner, 20 Nov 2026, seventeenth round)
+
+- `CLOCK_TOWER_TOP` is now -0.006 (was -0.04): measured at 390 × 844 the Clock Towers label moved from 218.8 to 248.6 px, 30 px lower.

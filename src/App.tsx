@@ -45,7 +45,8 @@ const INTRO_SECONDS = 2.4;
 const HARAM_VIEW_DISTANCE = 2400;
 const HARAM_FLIGHT_SECONDS = 3;
 /** Where the Clock Tower's top sits in that view: this fraction of the way down the map. */
-const CLOCK_TOWER_TOP = -0.04; // owner: the spire may go slightly past the top edge
+// Owner: the spire may touch the top edge. -0.006 = 30 px lower than the earlier -0.04 on a 390 x 844 phone (map area 763 px).
+const CLOCK_TOWER_TOP = -0.006;
 const CITY_VIEW = 60_000; // further out than this: only city names (and Badr)
 
 /** Papercut: the legend's colours (the owner's). */

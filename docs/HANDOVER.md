@@ -309,3 +309,8 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 - Tapping the Masjid al-Haram pin (Papercut) now flies to a view 2.4 km out (`HARAM_VIEW_DISTANCE`), tilted (0.85 rad), looking from the Kaabah's far side towards the Clock Towers, with the towers (halfway up, 300 m) centred across the screen and 30% of the way down (`focusFacing` in CityScene.ts, which solves for the point looked at). The zoom takes 3 s with an ease-out-quint curve, so it settles very slowly at the end.
 - All short camera moves now swing around the point looked at (distance on a log scale, tilt and compass direction eased, the shorter way round), so a change of side is seen as a turn instead of a jump to the other side.
 - Noted: at 2.4 km the buildings are still rising (they reach full height at 1.45 km), so the Clock Towers show at about 60% of their height. Raised with the owner.
+
+## Full height at 2.4 km; Clock Tower near the top (owner, 20 Nov 2026, twelfth round)
+
+- Buildings now rise between 4.8 and 2.5 km (`PAPER_STAGES.growStart` / `growEnd`; were 3.5 and 1.45 km), so they are at full height in the 2.4 km Masjid al-Haram view. Because the street pins and Green Dome label follow `growStart`, they now appear from 4.8 km.
+- The Masjid al-Haram view now places the top of the tallest building (the Clock Tower's spire) 7% of the way down the map (`CLOCK_TOWER_TOP`), still centred across.

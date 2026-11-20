@@ -37,6 +37,8 @@ const INTRO_SECONDS = 2.4;
 /** The Masjid al-Haram view: camera distance, and how long the zoom in takes. */
 const HARAM_VIEW_DISTANCE = 2400;
 const HARAM_FLIGHT_SECONDS = 3;
+/** Where the Clock Tower's top sits in that view: this fraction of the way down the map. */
+const CLOCK_TOWER_TOP = 0.07;
 const CITY_VIEW = 60_000; // further out than this: only city names (and Badr)
 
 /** Papercut: the legend's colours (the owner's). */
@@ -260,8 +262,10 @@ export function App() {
     }
     if (p.id === 'haram' && PAPER && city?.landmarks.towers) {
       // The Masjid al-Haram view (owner, 20 Nov 2026): 2.4 km out, looking towards the
-      // Clock Towers, which sit centred near the top; a slow, gentle finish.
-      sceneRef.current?.focusFacing(toScene([0, 0]), toScene(city.landmarks.towers), 300, HARAM_VIEW_DISTANCE, 0.85, 0.3, HARAM_FLIGHT_SECONDS, easeOutQuint);
+      // Clock Towers, centred across and as high on the screen as they fit; a slow, gentle finish.
+      // The top of the tallest building (the Clock Tower's spire) sits just below the top edge.
+      const top = Math.max(...city.buildings.map((b) => b.h));
+      sceneRef.current?.focusFacing(toScene([0, 0]), toScene(city.landmarks.towers), top, HARAM_VIEW_DISTANCE, 0.85, CLOCK_TOWER_TOP, HARAM_FLIGHT_SECONDS, easeOutQuint);
     } else {
       sceneRef.current?.focus(sitePos(p), focusDistance(p));
     }

@@ -18,7 +18,7 @@ Status: **group 1 approved for the first version (15 Nov 2026):** Masjid al-Hara
 | Yalamlam (As-Sa'diyyah) | People of Yemen | way 456362592, 20.5172 N 39.8711 E | as above |
 | Dhat 'Irq | People of Iraq | way 457487766, 21.9301 N 40.4257 E | Set by the Prophet ﷺ: Abu Dawud 1740 ([link](https://search.hadith-mcp.org/?id=22244)), Nasa'i 2661 ([link](https://search.hadith-mcp.org/?id=17397)). Set by Umar: Bukhari, cited in Bulugh al-Maram 833 ([link](https://search.hadith-mcp.org/?id=49950)). Both shown. |
 
-Not shown (owner to decide): Miqat Wadi Mahram (way 1493000494) and Miqat al-Hada (node 5423164921), both in the export.
+Not shown (owner, 20 Nov 2026: the five only for now): Miqat Wadi Mahram (way 1493000494) and Miqat al-Hada (node 5423164921). Neither is named in any hadith in the Hadith tool; for scholar review, whether to add them as a note on Qarn al-Manazil.
 
 ## Makkah
 

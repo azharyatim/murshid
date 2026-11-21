@@ -345,3 +345,4 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 ## Masjid al-Nabawi view without the turn (owner, 20 Nov 2026, eighteenth round)
 
 - Tapping Masjid al-Nabawi no longer turns the map: it keeps the current compass direction (north-up from the Madinah view) and tilts in with the Green Dome centred across, 42% of the way down. Coming from the north-up Madinah view the camera stands south of the mosque, so the dome is in front of the mosque and Makkah's arrow is at the bottom. The Masjid al-Haram view still turns to face the Clock Towers.
+- Then (owner, 21 Nov 2026): the Masjid al-Nabawi dot, not the Green Dome, is centred across the screen (`NABAWI_DOT_Y` 0.356 keeps it at the height it had, 255 px at 390 × 844). Still no turn.

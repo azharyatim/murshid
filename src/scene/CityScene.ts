@@ -143,6 +143,19 @@ const REGION_BOUNDS = { minX: -120_000, maxX: 100_000, minZ: -210_000, maxZ: 290
 const MIN_POLAR = 0.02; // straight down
 const MAX_POLAR = 1.3; // close to the horizon
 const AERIAL_POLAR = 0.4;
+/** Papercut's opening view: camera 23 km from the ground (owner, 20 Nov 2026). */
+const CITY_VIEW_DISTANCE = 23_000;
+/** Texture size for each city's 32 km middle ring. */
+const MID_TEX_SIZE = 3072;
+/** How much long flights climb (rho in van Wijk and Nuij; Mapbox's default is 1.42). */
+const FLY_CURVE = 1.42;
+/** The opening view's starting turn: 30 degrees clockwise (north points up and to the right). */
+const OPENING_TURN = THREE.MathUtils.degToRad(30);
+
+const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2);
+/** Settles very gently: most of the move early, a long slow finish. */
+export const easeOutQuint = (t: number) => 1 - Math.pow(1 - t, 5);
 const TILTED_POLAR = 1.0;
 // When the map first tilts from the default north-up view, look from the north
 // side (camera north of the Haram, facing south). From the south the Clock
@@ -177,6 +190,15 @@ interface Flight {
   fromTarget: THREE.Vector3;
   toTarget: THREE.Vector3;
   t: number;
+  /** Seconds the flight takes, and whether it eases in as well as out (long city-to-city flights). */
+  duration: number;
+  ease: (t: number) => number;
+  /**
+   * Long flights rise and come down again (owner, 20 Nov 2026), on the smooth zoom-and-pan
+   * path of van Wijk and Nuij (as in web maps' "fly to"), which keeps the screen moving
+   * at a steady speed: no sudden zoom in the middle.
+   */
+  arc: { w0: number; r0: number; S: number; d1: number; toWidth: number; dir0: THREE.Vector3; dir1: THREE.Vector3 } | null;
 }
 
 /**
@@ -224,9 +246,23 @@ export class CityScene {
     frameStart: number;
     fps: number | null;
     lastReport: number;
+    /** Loading: ground images still being painted, and whether the region map is in. */
+    pending: number;
+    /** Ground patches asked for so far. */
+    started: number;
+    regionDone: boolean;
   } | null = null;
   /** Papercut: called a few times a second with the zoom stage, for the jump buttons and the readout. */
   onPaperStage: ((s: PaperStage) => void) | null = null;
+  /** Called once, when the map the opening view needs has been drawn (Papercut: its ground images). */
+  onReady: (() => void) | null = null;
+  private readyFired = false;
+  private settleUntil = 0;
+  private lastSharpCheck = 0;
+  /** Highest pixel density drawn (Papercut phones: 1.75, to keep the frame rate up). */
+  private ratioCap = 2;
+  /** On-screen arrows pointing to places that are off screen (the Makkah and Madinah arrows). */
+  private pointers: { el: HTMLElement; pos: [number, number] }[] = [];
   /**
    * Flat layers lying on the ground (sea, streets, road lines), each lifted a
    * little more than the one below. The lift grows with viewing distance: far
@@ -278,7 +314,8 @@ export class CityScene {
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     // Papercut is tuned for phones: pixel ratio capped at 1.75 there, 2 on larger screens.
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, paper && small ? 1.75 : 2));
+    this.ratioCap = paper && small ? 1.75 : 2;
+    this.renderer.setPixelRatio(this.wantedRatio());
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = paper ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     if (model) {
@@ -435,7 +472,11 @@ export class CityScene {
 
     this.setTheme(theme);
     this.resize();
-    this.showAll(false);
+    // Papercut opens twice as far out (46 km); App brings it in to the opening view once the map is ready.
+    // It also starts turned 30 degrees clockwise (owner, 20 Nov 2026) and turns back to north-up on the way in.
+    if (this.paper) this.cityView(0, false, 0, this.reducedMotion ? 1 : 0.5, this.reducedMotion ? 0 : OPENING_TURN);
+    else this.showAll(false);
+    if (!this.paper) this.markReady();
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas.parentElement ?? canvas);
     this.raf = requestAnimationFrame(this.tick);
@@ -582,6 +623,9 @@ export class CityScene {
       frameStart: 0,
       fps: null,
       lastReport: 0,
+      pending: 0,
+      started: 0,
+      regionDone: false,
     };
     const make = (c: CityData, key: 'makkah' | 'madinah', root: THREE.Group, withBuildings: boolean) => {
       const S = PAPER_STAGES;
@@ -660,8 +704,13 @@ export class CityScene {
     const p = this.paper!;
     const url = (f: string) => `${import.meta.env.BASE_URL}data/${f}`;
     try {
-      const [meta, heights] = await Promise.all([fetch(url('terrain-meta.json')).then((r) => r.json()), loadTerrain(url('terrain-region.png'))]);
+      const heightsLoad = loadTerrain(url('terrain-region.png'));
+      // The small meta file first: with it, the city's own ground patches can start
+      // loading while the large region image is still on its way.
+      const meta = await fetch(url('terrain-meta.json')).then((r) => r.json());
       p.meta = meta;
+      this.needsRender = true;
+      const heights = await heightsLoad;
       const rect = worldRect(meta.region.latlon ?? TERRAIN_REGION_LATLON);
       const max = this.renderer.capabilities.maxTextureSize;
       const th = Math.min(meta.region.nz, max);
@@ -678,6 +727,7 @@ export class CityScene {
     } catch (e) {
       console.error('Could not load the terrain', e);
     }
+    p.regionDone = true;
   }
 
   private paperTexture(cv: HTMLCanvasElement) {
@@ -698,12 +748,31 @@ export class CityScene {
     const m = p.meta?.[pt.metaKey];
     if (pt.painted || !m) return;
     pt.painted = true;
+    p.started++;
+    p.pending++;
+    try {
+      await this.paintPatch(c, pt, m);
+    } catch (e) {
+      console.error('Could not load a ground patch', e);
+    }
+    p.pending--;
+    this.needsRender = true;
+  }
+
+  private async paintPatch(c: PaperCity, pt: PaperPatch, m: { x: number; z: number; half: number; n: number }) {
+    const p = this.paper!;
     const heights = await loadTerrain(`${import.meta.env.BASE_URL}data/terrain-${pt.file}.png`);
     const grid: TerrainGrid = { x: m.x - m.half, z: m.z - m.half, w: m.half * 2, h: m.half * 2, nx: m.n, nz: m.n };
-    const size = Math.min(p.texSize, this.renderer.capabilities.maxTextureSize);
+    // The middle ring fills most of the opening 23 km view, so it gets a finer image:
+    // 3072 px over 32 km (about 10 m per pixel, finer than the screen shows it), where
+    // 1536 px left its contour edges soft and stepped (owner, 20 Nov 2026).
+    const want = pt.half > 4000 ? MID_TEX_SIZE : p.texSize;
+    const size = Math.min(want, this.renderer.capabilities.maxTextureSize);
+    // Keep the paper's drop shadow the same width on the ground at the larger size.
+    const shadow = Math.max(1, Math.round((pt.shadow * size) / p.texSize));
     const h = pt.half;
     const world = { x0: c.centre.x - h, x1: c.centre.x + h, z0: c.centre.z - h, z1: c.centre.z + h };
-    const cv = await paintPaper(heights, grid, world, size, size, pt.shadow, true);
+    const cv = await paintPaper(heights, grid, world, size, size, shadow, true);
     pt.mat.map = this.paperTexture(cv);
     pt.mat.needsUpdate = true;
     this.needsRender = true;
@@ -768,6 +837,17 @@ export class CityScene {
       p.legend.style.opacity = a.toFixed(2);
       p.legend.style.visibility = a > 0.04 ? 'visible' : 'hidden';
     }
+    // Ready once the region image (the 46 km start reaches past Makkah's 32 km ring) and
+    // every ground patch this view asked for are painted (or failed).
+    if (!this.readyFired && p.pending === 0 && p.regionDone) this.markReady();
+  }
+
+  private markReady() {
+    this.readyFired = true;
+    this.needsRender = true;
+    this.settleUntil = performance.now() + 1500;
+    // Let the finished frame reach the screen before the loading screen goes.
+    requestAnimationFrame(() => this.onReady?.());
   }
 
   /**
@@ -790,8 +870,70 @@ export class CityScene {
   /** Papercut: jump to the region, or into a city's 3D view (0 = Makkah, 1 = Madinah). */
   jumpTo(target: 'region' | 0 | 1) {
     if (!this.paper || target === 'region') return this.showAll();
-    const c = this.paper.cities[target];
-    if (c) this.flyTo(c.centre.clone(), 1100, 0.85, this.tiltAzimuth());
+    this.cityView(target);
+  }
+
+  /**
+   * Papercut's opening view of a city (owner, 20 Nov 2026): straight down, north up,
+   * 23 km out, with the city's mosque centred across and two thirds of the way down the screen.
+   */
+  cityView(index: 0 | 1, animate = true, duration = 0.6, zoom = 1, azimuth = 0) {
+    const c = this.paper?.cities[index];
+    if (!c) return this.showAll(animate);
+    // zoom 0.5 = twice as far (the page opens there, then zooms in; owner, 20 Nov 2026).
+    const dist = CITY_VIEW_DISTANCE / zoom;
+    const visible = 2 * dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    // Makkah: the Haram two thirds of the way down. Madinah: the Prophet's Mosque slightly
+    // above the middle (owner, 20 Nov 2026).
+    const down = index === 0 ? 2 / 3 : 0.42;
+    // Move the point looked at towards the top of the screen, whichever way the map is turned.
+    const target = c.centre.clone();
+    target.x -= Math.sin(azimuth) * (down - 1 / 2) * visible;
+    target.z -= Math.cos(azimuth) * (down - 1 / 2) * visible;
+    // Centred across the width (owner, 20 Nov 2026; this replaced a nudge east for the Jabal al-Nur label).
+    this.flyTo(target, dist, AERIAL_POLAR, azimuth, animate, duration);
+  }
+
+  /** Shows each `el` at the screen edge, pointing towards its `pos`, whenever that is off screen. */
+  setPointers(pointers: { el: HTMLElement | null; pos: [number, number] }[]) {
+    this.pointers = pointers.filter((p): p is { el: HTMLElement; pos: [number, number] } => Boolean(p.el));
+    this.needsRender = true;
+  }
+
+  private updatePointer(ptr: { el: HTMLElement; pos: [number, number] }, w: number, h: number) {
+    const v = this.tmp.set(ptr.pos[0], 0, ptr.pos[1]).project(this.camera);
+    const onScreen = v.z < 1 && Math.abs(v.x) < 0.9 && Math.abs(v.y) < 0.9;
+    if (onScreen) {
+      ptr.el.style.visibility = 'hidden';
+      return;
+    }
+    // Screen direction: from the point looked at (the screen centre) towards a point a
+    // little way along the ground to the target. Works when the map is tilted too.
+    const t = this.controls.target;
+    const dx = ptr.pos[0] - t.x;
+    const dz = ptr.pos[1] - t.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const step = this.distance() * 0.05;
+    const a = this.tmp.set(t.x + (dx / len) * step, 0, t.z + (dz / len) * step).project(this.camera);
+    let sx = a.x * w * 0.5;
+    let sy = -a.y * h * 0.5;
+    const n = Math.hypot(sx, sy) || 1;
+    sx /= n;
+    sy /= n;
+    // The arrow's point, kept inside the screen: room for its label (below and to the
+    // right), clear of the map buttons (right) and the key and notice (bottom).
+    const box = { left: 28, right: w - 96, top: 40, bottom: h - 140 };
+    const cx = w / 2;
+    const cy = h / 2;
+    const k = Math.min(
+      sx > 0 ? (box.right - cx) / sx : sx < 0 ? (box.left - cx) / sx : Infinity,
+      sy > 0 ? (box.bottom - cy) / sy : sy < 0 ? (box.top - cy) / sy : Infinity,
+    );
+    const x = cx + sx * k;
+    const y = cy + sy * k;
+    ptr.el.style.visibility = 'visible';
+    ptr.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+    ptr.el.style.setProperty('--angle', `${Math.atan2(sy, sx).toFixed(3)}rad`);
   }
 
   /** Papercut: the colour legend, shown as the buildings rise. */
@@ -1024,7 +1166,15 @@ export class CityScene {
 
   // Camera moves ------------------------------------------------------------
 
-  private flyTo(target: THREE.Vector3, distance: number, polar: number, azimuth: number, animate = true) {
+  private flyTo(
+    target: THREE.Vector3,
+    distance: number,
+    polar: number,
+    azimuth: number,
+    animate = true,
+    duration = 0.6,
+    ease: ((t: number) => number) | null = null,
+  ) {
     const d = THREE.MathUtils.clamp(distance, MIN_DISTANCE, this.controls.maxDistance);
     const p = THREE.MathUtils.clamp(polar, MIN_POLAR, MAX_POLAR);
     const toPos = new THREE.Vector3(
@@ -1040,13 +1190,38 @@ export class CityScene {
       this.needsRender = true;
       return;
     }
-    this.flight = {
-      fromPos: this.camera.position.clone(),
-      toPos,
-      fromTarget: this.controls.target.clone(),
-      toTarget: target.clone(),
-      t: 0,
-    };
+    const fromTarget = this.controls.target.clone();
+    const fromPos = this.camera.position.clone();
+    // How far the point looked at travels, against how much ground the screen shows.
+    const travel = Math.hypot(target.x - fromTarget.x, target.z - fromTarget.z);
+    const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const d0 = fromPos.distanceTo(fromTarget);
+    let arc: Flight['arc'] = null;
+    if (travel > 2 * Math.max(d0, d) * tanV) {
+      // Work in visible ground height (w), which is proportional to the camera distance.
+      const toWidth = 2 * tanV;
+      const w0 = d0 * toWidth;
+      const w1 = d * toWidth;
+      const rho = FLY_CURVE;
+      const d1 = travel;
+      const b0 = (w1 * w1 - w0 * w0 + rho ** 4 * d1 * d1) / (2 * w0 * rho * rho * d1);
+      const b1 = (w1 * w1 - w0 * w0 - rho ** 4 * d1 * d1) / (2 * w1 * rho * rho * d1);
+      const r0 = Math.log(Math.sqrt(b0 * b0 + 1) - b0);
+      const r1 = Math.log(Math.sqrt(b1 * b1 + 1) - b1);
+      arc = {
+        w0,
+        r0,
+        S: (r1 - r0) / rho,
+        d1,
+        toWidth,
+        dir0: fromPos.clone().sub(fromTarget).normalize(),
+        dir1: toPos.clone().sub(target).normalize(),
+      };
+    }
+    // City-to-city flights: the caller chooses the time (2 s from a city view, 3 s from a mosque view).
+    const time = duration;
+    const curve = ease ?? (duration > 1 ? easeInOutCubic : easeOutCubic);
+    this.flight = { fromPos, toPos, fromTarget, toTarget: target.clone(), t: 0, duration: time, ease: curve, arc };
   }
 
   /** For automated tests: the camera's distance, compass direction and tilt. */
@@ -1089,8 +1264,63 @@ export class CityScene {
   }
 
   /** Move in on one point, keeping the current compass direction. */
-  focus(pos: [number, number], distance = 720) {
-    this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), distance, 0.75, this.tiltAzimuth());
+  focus(pos: [number, number], distance = 720, duration = 0.6, ease: ((t: number) => number) | null = null) {
+    this.flyTo(new THREE.Vector3(pos[0], 0, pos[1]), distance, 0.75, this.tiltAzimuth(), true, duration, ease);
+  }
+
+  /** Distance, tilt and compass direction of a camera position around a target. */
+  private sphericalOf(pos: THREE.Vector3, target: THREE.Vector3) {
+    const v = pos.clone().sub(target);
+    const distance = Math.max(1, v.length());
+    return { distance, polar: Math.acos(THREE.MathUtils.clamp(v.y / distance, -1, 1)), azimuth: Math.atan2(v.x, v.z) };
+  }
+
+  /**
+   * A tilted view looking from `from` towards `anchor` (both scene metres), with the anchor
+   * centred across the screen and `anchorY` of the way down it (owner, 20 Nov 2026: the
+   * Masjid al-Haram view, Clock Towers centred near the top). `anchorHeight` is the height
+   * on the anchor that is placed (e.g. halfway up a tower).
+   */
+  focusFacing(
+    from: [number, number],
+    anchor: [number, number],
+    anchorHeight: number,
+    distance: number,
+    polar: number,
+    anchorY: number,
+    duration: number,
+    ease: (t: number) => number,
+  ) {
+    const dx = anchor[0] - from[0];
+    const dz = anchor[1] - from[1];
+    // The camera stands on the far side of `from`, looking along from -> anchor.
+    const azimuth = Math.atan2(-dx, -dz);
+    const cam = this.camera.clone();
+    const anchorPt = new THREE.Vector3(anchor[0], anchorHeight, anchor[1]);
+    const place = (u: number) => {
+      const t = new THREE.Vector3(from[0] + dx * u, 0, from[1] + dz * u);
+      cam.position.set(
+        t.x + distance * Math.sin(polar) * Math.sin(azimuth),
+        distance * Math.cos(polar),
+        t.z + distance * Math.sin(polar) * Math.cos(azimuth),
+      );
+      cam.lookAt(t);
+      cam.updateMatrixWorld();
+      return t;
+    };
+    // Slide the point looked at along the line until the anchor sits at anchorY.
+    let lo = -2;
+    let hi = 2;
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      place(mid);
+      const y = (-anchorPt.clone().project(cam).y + 1) / 2; // 0 top, 1 bottom
+      // Moving the target towards the anchor brings the anchor down the screen.
+      if (y < anchorY) lo = mid;
+      else hi = mid;
+    }
+    const target = place((lo + hi) / 2);
+    this.flyTo(target, distance, polar, azimuth, true, duration, ease);
   }
 
   /** Fit a set of points (scene metres) on screen from above, north up. Used for the miqat view. */
@@ -1136,10 +1366,33 @@ export class CityScene {
 
   // Frame loop ----------------------------------------------------------------
 
+  private wantedRatio() {
+    return Math.min(window.devicePixelRatio || 1, this.ratioCap);
+  }
+
+  /**
+   * The canvas is drawn at its on-screen size times the screen's pixel density. Some
+   * phones (and the preview page's frame) report the final size or density only after
+   * the page has opened, which left the first picture blurry until the map was touched
+   * (owner, 20 Nov 2026). So this is checked a few times a second, not only on resize.
+   */
+  private checkSharpness() {
+    const parent = this.canvas.parentElement ?? this.canvas;
+    const pr = this.wantedRatio();
+    const w = Math.max(1, parent.clientWidth);
+    const h = Math.max(1, parent.clientHeight);
+    if (pr !== this.renderer.getPixelRatio() || this.canvas.width !== Math.floor(w * pr) || this.canvas.height !== Math.floor(h * pr)) this.resize();
+  }
+
   private resize() {
     const parent = this.canvas.parentElement ?? this.canvas;
     const w = Math.max(1, parent.clientWidth);
     const h = Math.max(1, parent.clientHeight);
+    const pr = this.wantedRatio();
+    if (pr !== this.renderer.getPixelRatio()) {
+      this.renderer.setPixelRatio(pr);
+      this.composer?.setPixelRatio(pr);
+    }
     this.renderer.setSize(w, h, false);
     this.composer?.setSize(w, h);
     this.camera.aspect = w / h;
@@ -1170,6 +1423,7 @@ export class CityScene {
       const y = (-this.tmp.y * 0.5 + 0.5) * h;
       pin.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
     }
+    for (const ptr of this.pointers) this.updatePointer(ptr, w, h);
   }
 
   /** Marks pins that a building stands in front of, so they can be drawn faded. */
@@ -1190,6 +1444,12 @@ export class CityScene {
     this.raf = requestAnimationFrame(this.tick);
     const dt = Math.min(0.05, (time - this.last) / 1000 || 0);
     this.last = time;
+    if (time - this.lastSharpCheck > 250) {
+      this.lastSharpCheck = time;
+      this.checkSharpness();
+    }
+    // Keep redrawing for a moment after the map is revealed, so no half-ready picture stays up.
+    if (time < this.settleUntil) this.needsRender = true;
     // Papercut: the nodes only animate (and keep the screen redrawing) while they are visible.
     if (!this.reducedMotion && (!this.paper || this.nodeMesh.visible)) {
       for (const n of this.nodes) n.angle += n.speed * dt;
@@ -1198,10 +1458,37 @@ export class CityScene {
     }
     if (this.flight) {
       const f = this.flight;
-      f.t = Math.min(1, f.t + dt / 0.6);
-      const e = 1 - Math.pow(1 - f.t, 3);
-      this.camera.position.lerpVectors(f.fromPos, f.toPos, e);
-      this.controls.target.lerpVectors(f.fromTarget, f.toTarget, e);
+      f.t = Math.min(1, f.t + dt / f.duration);
+      const e = f.ease(f.t);
+      if (f.arc) {
+        // Gentle ease at both ends only (sine), so the steady middle stays steady.
+        const a = f.arc;
+        const k = (1 - Math.cos(Math.PI * f.t)) / 2;
+        const rho = FLY_CURVE;
+        const sr = rho * k * a.S + a.r0;
+        const along = ((a.w0 / (rho * rho * a.d1)) * (Math.cosh(a.r0) * Math.tanh(sr) - Math.sinh(a.r0))) * a.d1;
+        const w = (a.w0 * Math.cosh(a.r0)) / Math.cosh(sr);
+        const frac = f.t >= 1 ? 1 : along / a.d1;
+        this.controls.target.lerpVectors(f.fromTarget, f.toTarget, frac);
+        const dir = this.tmp.copy(a.dir0).lerp(a.dir1, k).normalize();
+        this.camera.position.copy(this.controls.target).addScaledVector(dir, f.t >= 1 ? f.toPos.distanceTo(f.toTarget) : w / a.toWidth);
+      } else {
+        // Swing around the point looked at (owner, 20 Nov 2026): distance, tilt and compass
+        // direction change smoothly, so a change of side is seen as a turn, not a jump.
+        this.controls.target.lerpVectors(f.fromTarget, f.toTarget, e);
+        const a = this.sphericalOf(f.fromPos, f.fromTarget);
+        const b = this.sphericalOf(f.toPos, f.toTarget);
+        let dAz = b.azimuth - a.azimuth;
+        dAz = Math.atan2(Math.sin(dAz), Math.cos(dAz)); // the shorter way round
+        const dist = Math.exp(THREE.MathUtils.lerp(Math.log(a.distance), Math.log(b.distance), e));
+        const polar = THREE.MathUtils.lerp(a.polar, b.polar, e);
+        const az = a.azimuth + dAz * e;
+        this.camera.position.set(
+          this.controls.target.x + dist * Math.sin(polar) * Math.sin(az),
+          this.controls.target.y + dist * Math.cos(polar),
+          this.controls.target.z + dist * Math.sin(polar) * Math.cos(az),
+        );
+      }
       if (f.t >= 1) this.flight = null;
       this.needsRender = true;
     }

@@ -214,13 +214,6 @@ Adopted from branch `claude/hopeful-heisenberg-a1p880` (not merged; reference co
 - **Middle ring (owner, 20 Nov 2026):** each city also has a 32 km ground patch with 62.5 m cells (`terrain-makkah-mid.png`, `terrain-madinah-mid.png`, about 110 KB together), fading in from 170 to 70 km, under the sharp 8 km patch. Views of about 10 to 40 km are now crisp; the hand-over to the region map shows as a soft blend around 70 to 120 km.
 - **Known limits:** the region ground is 145 m per cell, so beyond the middle ring (more than about 16 km from a city) it still looks stepped; frame rate not measured on a real phone.
 
-## Side icons: Madinah, Makkah, Umrah (owner, 23 Nov 2026)
-
-Three icon buttons on the left edge of the map, centred vertically, top to bottom: Madinah (the courtyard umbrella, from the owner's reference), Makkah (the Kaabah as a simple cube, drawn without a reference) and Umrah (a pilgrim in ihram, from the owner's reference). Madinah and Makkah fly to that city's 3D view, like the jump buttons, and turn gold while you are there. Umrah flies to Makkah and opens the panel with the seven steps. Papercut look only. See `.side-rail` in `src/App.tsx` and `src/styles.css`.
-
-- The Umrah icon shows a human figure, which goes against the "never render an image of a person" rule above. It was drawn because the owner sent it as the reference, and they were asked to confirm it.
-- The Makkah and Madinah jump buttons at the bottom left now do the same as two of the icons. Whether to keep both is the owner's call.
-
 ## Later feature ideas from the owner (not scheduled)
 
 - **Hotels.** Colour hotels differently, and let a pilgrim find their own hotel and see the walking route to the Haram. In the current export 158 of 413 outlines are tagged as hotels (127 named); unmarked buildings may be hotels too, so this must be labelled as incomplete.
@@ -257,3 +250,106 @@ The owner chose real OpenStreetMap data, but the previous session could not down
 3. Try the map download once.
 4. Tell the owner, briefly, where things stand and ask the three open questions.
 5. Do not start stage 2 or change the default look until they answer.
+
+## Opening view, Madinah arrow, loading screen (owner, 20 Nov 2026)
+
+- **Opening view (Papercut):** straight down, north up, 23 km out, with Masjid al-Haram two thirds of the way down the map area and the view nudged east (12% of the screen width) so the start of the Jabal al-Nur label ("Jaba") shows at the right edge on a 390px phone. Wider or narrower phones show more or less of it. See `cityView` and `CITY_VIEW_DISTANCE` in `src/scene/CityScene.ts`. "Show all" and the Region button still go to the two-city region view.
+- **Makkah and Madinah jump buttons removed.** Only Region remains in that group.
+- **Madinah arrow:** a pill with an arrow and "Madinah", held at the screen edge and turned towards the Prophet's Mosque while it is off screen (it follows rotation and tilt). Tapping it flies to the same 23 km framing over Madinah. Its own choice, not specified by the owner. There is no matching arrow back to Makkah yet (open question). See `setPointer` / `updatePointer` and `.dir-arrow`.
+- **Loading screen:** three paper layers in the owner's ground colours 1 to 3, lifting in turn, with "Loading the map". It stays until the opening view's ground images are painted (`onReady`), or 20 s at most. Still under reduced motion.
+- Known: from 23 km over Madinah, the edge of the sharp 8 km ground patch shows as a faint straight line north of the mosque.
+
+## Cleaner map (owner, 20 Nov 2026, second round)
+
+- **Madinah arrow restyled** after the Masjid al-Aqsa marker on nuzul-atlas.app (owner's screenshot): a small accent-gold arrowhead, no pill, with "Madinah" in bold gold below it and a light halo for legibility. The whole thing is a 44px touch target.
+- **Removed:** the "1 2 At the miqat, before Makkah" chip, the Region button, and the zoom in / zoom out buttons. Rotate and 2D/3D remain.
+- Because the chip was the only way into the miqat view, the step 1 and 2 buttons in the bottom sheet now open it.
+- **Accessibility gap:** without the zoom and Region buttons, zooming needs a pinch, so keyboard users cannot zoom. To be solved before stage 6 (offline, accessibility).
+
+## Makkah arrow and reset button (owner, 20 Nov 2026, third round)
+
+- A matching **Makkah arrow** points to Masjid al-Haram whenever it is off screen; tapping it goes to the opening view. Each arrow hides while its own city is on screen, so at the opening view only "Madinah" shows, and over Madinah only "Makkah". See `setPointers` in `CityScene.ts`.
+- The **circular-arrow button** (above 2D/3D) now resets to the opening view instead of rotating the map 45°. Rotating is now by two-finger twist only.
+
+## Centred city views; reset closes the sheet (owner, 20 Nov 2026, fourth round)
+
+- The opening view and the Madinah view now centre the mosque's dot across the screen width (measured: 195 px of 390 for both). This removed the nudge east, so the Jabal al-Nur label no longer shows at 390 px; only its dot sits at the right edge. Raised with the owner.
+- The reset button also collapses the bottom sheet.
+
+## Floating arrows (owner, 20 Nov 2026, fifth round)
+
+- The Makkah and Madinah arrows (arrowhead and name together) bob in a sine wave: 3 px either side of rest, a full cycle every 2.4 s, looping, along the direction the arrow points. Still when the device asks for reduced motion. CSS only (`.dir-arrow-bob`, `@property --bob`), so it costs no 3D redraws. Measured in Chromium: 6 px travel, none under reduced motion.
+
+## Sharper opening map (owner, 20 Nov 2026, sixth round)
+
+- The owner found the map blurry when it first appears. Cause: most of the 23 km opening view is each city's 32 km middle ring (62.5 m data), painted at only 1536 px on phones (about 21 m per pixel, coarser than the screen), so contour edges looked soft and stepped. It is now painted at 3072 px (`MID_TEX_SIZE`, about 10 m per pixel), with its paper shadow scaled to keep the same width on the ground. Cost: about 50 MB of graphics memory per city once visited (was about 12 MB). Not yet measured on a mid-range phone.
+- The loading screen no longer waits for the 2.6 MB region image: the opening view lies inside Makkah's middle ring, so it shows once Makkah's two ground patches are painted. The patches now start loading as soon as the small `terrain-meta.json` arrives.
+
+## Blurry until touched; slower city flights (owner, 20 Nov 2026, seventh round)
+
+- On the owner's phone the whole map stayed blurry until it was touched. Likely cause: the phone (or the preview page's frame) reported its final size or pixel density only after the scene was made, and nothing re-read it until a touch redrew the map. The scene now checks the canvas against the current size and density four times a second and redraws at the right sharpness (`checkSharpness`), and keeps redrawing for 1.5 s after the loading screen lifts. Tested by changing the emulated density after load: the canvas went from 390 to 682 px wide (390 × 1.75 cap) with no touch. Not yet confirmed on the owner's phone.
+- The Makkah and Madinah arrows now fly between the cities in 2.4 s (`CITY_FLIGHT_SECONDS` in App.tsx) with an ease-in-out curve; other camera moves keep 0.6 s.
+
+## Slower flights and the opening zoom-out (owner, 20 Nov 2026, eighth round)
+
+- City arrows and the reset button now fly in 3.6 s (`CITY_FLIGHT_SECONDS`), eased in and out.
+- The page opens at twice the zoom (11.5 km, same framing) behind the loading screen, and once the map is ready it zooms out to the 23 km opening view in 2.4 s (`INTRO_SECONDS`). "Double the zoom" was read as twice as close, like the "1.7x" zoom readout in the owner's nuzul-atlas reference. Under reduced motion it simply opens at 23 km.
+
+## City flights rise and descend (owner, 20 Nov 2026, ninth round)
+
+- The owner felt no slowdown on the Makkah/Madinah flights: at a steady 23 km the 340 km trip crossed about 17 screen-heights, so the middle still flashed past. Long flights (travelling more than two screen-heights) now climb so that start and end fit on screen together (about 630 km up at the halfway point for Makkah to Madinah), glide across and come down; the height moves on a log scale so zooming feels even. Short moves, like most resets, are unchanged. See `arc` in `flyTo` / `tick`.
+
+## Steady city flights; sheet stays closed (owner, 20 Nov 2026, tenth round)
+
+- The first arc had a sudden zoom mid-flight (75 to 580 km in about half a second) because its climb followed the eased progress. City flights now follow the van Wijk and Nuij smooth zoom-and-pan path (as web maps' "fly to" do; curve `FLY_CURVE` 1.42), with a sine ease only at the ends, so each moment zooms by about the same amount. Peak about 590 km. City flights take at least 5 s (`LONG_FLIGHT_SECONDS`), including a reset from Madinah; short resets keep 3.6 s.
+- The bottom sheet no longer opens by itself: choosing a step, place or miqat only updates its bar, and the arrows and reset close it. Only tapping the bar opens it.
+
+## Masjid al-Haram view, turning flights (owner, 20 Nov 2026, eleventh round)
+
+- Tapping the Masjid al-Haram pin (Papercut) now flies to a view 2.4 km out (`HARAM_VIEW_DISTANCE`), tilted (0.85 rad), looking from the Kaabah's far side towards the Clock Towers, with the towers (halfway up, 300 m) centred across the screen and 30% of the way down (`focusFacing` in CityScene.ts, which solves for the point looked at). The zoom takes 3 s with an ease-out-quint curve, so it settles very slowly at the end.
+- All short camera moves now swing around the point looked at (distance on a log scale, tilt and compass direction eased, the shorter way round), so a change of side is seen as a turn instead of a jump to the other side.
+- Noted: at 2.4 km the buildings are still rising (they reach full height at 1.45 km), so the Clock Towers show at about 60% of their height. Raised with the owner.
+
+## Full height at 2.4 km; Clock Tower near the top (owner, 20 Nov 2026, twelfth round)
+
+- Buildings now rise between 4.8 and 2.5 km (`PAPER_STAGES.growStart` / `growEnd`; were 3.5 and 1.45 km), so they are at full height in the 2.4 km Masjid al-Haram view. Because the street pins and Green Dome label follow `growStart`, they now appear from 4.8 km.
+- The Masjid al-Haram view now places the top of the tallest building (the Clock Tower's spire) 7% of the way down the map (`CLOCK_TOWER_TOP`), still centred across.
+
+## Madinah framing and timings (owner, 20 Nov 2026, thirteenth round)
+
+- Madinah view (arrow): the Prophet's Mosque sits 42% of the way down the map (slightly above the middle), centred across. Makkah stays at two thirds.
+- Tapping Masjid al-Nabawi: 3 s with the slow-finish curve (as for the Haram), turning as it goes.
+- Opening: the page now waits at 46 km (twice as far out) and zooms in to 23 km in 2.4 s. At 46 km the view reaches past Makkah's 32 km ring, so the loading screen again waits for the region image too.
+- The flight between the cities (arrows, or reset from Madinah) is 3 s (`LONG_FLIGHT_SECONDS`).
+
+## Opening turn (owner, 20 Nov 2026, fourteenth round)
+
+- The opening view starts at 46 km turned 30 degrees clockwise (`OPENING_TURN`; the owner said "-30 degrees", read as clockwise as in Figma's rotation field: north points up and to the right) and turns back to north-up while zooming in to 23 km. Under reduced motion it opens north-up at 23 km. `cityView` now takes a compass direction and keeps the mosque's framing for it.
+
+## Haram view higher, 2 s city flights, fallback-timer fix (owner, 20 Nov 2026, fifteenth round)
+
+- Masjid al-Haram view: the Clock Tower's spire now sits 4% above the top edge (`CLOCK_TOWER_TOP = -0.04`), so the whole scene sits higher; the owner accepted the tip going past the edge.
+- Flights between the cities take 2 s (`LONG_FLIGHT_SECONDS`, `ARROW_FLIGHT_SECONDS`).
+- Bug fixed: the loading screen's 20 s safety timer also flew the camera back to the opening view when the map had loaded normally, so about 20 s after opening the view jumped away from wherever the user was. It now does nothing once the map has reported ready (`readyRef`).
+
+## Masjid al-Nabawi view and flight times by starting view (owner, 20 Nov 2026, sixteenth round)
+
+- Tapping Masjid al-Nabawi now flies (3 s, slow finish) to a tilted view 1.5 km out (`NABAWI_VIEW_DISTANCE`, unchanged distance) looking from the mosque's centre towards the Green Dome, which sits centred across and 42% of the way down (`GREEN_DOME_Y`). The dome is on the mosque's south side, so this view also faces Makkah.
+- Flights between the cities take 2 s from a city view and 3 s from a mosque view (camera closer than 10 km; `betweenCitiesSeconds` in App.tsx). This applies to the arrows and to the reset button when it starts from Madinah.
+
+## Haram view 30 px lower (owner, 20 Nov 2026, seventeenth round)
+
+- `CLOCK_TOWER_TOP` is now -0.006 (was -0.04): measured at 390 × 844 the Clock Towers label moved from 218.8 to 248.6 px, 30 px lower.
+- Then 20 px lower again (owner, same day): `CLOCK_TOWER_TOP` 0.017; label at 268.7 px.
+
+## Masjid al-Nabawi view without the turn (owner, 20 Nov 2026, eighteenth round)
+
+- Tapping Masjid al-Nabawi no longer turns the map: it keeps the current compass direction (north-up from the Madinah view) and tilts in with the Green Dome centred across, 42% of the way down. Coming from the north-up Madinah view the camera stands south of the mosque, so the dome is in front of the mosque and Makkah's arrow is at the bottom. The Masjid al-Haram view still turns to face the Clock Towers.
+- Then (owner, 21 Nov 2026): the Masjid al-Nabawi dot, not the Green Dome, is centred across the screen (`NABAWI_DOT_Y` 0.356 keeps it at the height it had, 255 px at 390 × 844). Still no turn.
+
+## Side icons: Madinah, Makkah, Umrah (owner, 23 Nov 2026)
+
+- **Branch history:** the 20 to 21 Nov work (opening view, arrows, reset button, flights) was on `claude/intelligent-hopper-6f586y` and never merged into `main`. The 23 Nov session started from `main`, so the preview briefly lost that work until the branch was merged into `ccr-f79f06a5-hisn8c`. Check every `claude/*` branch against `main` before starting.
+- Three icon buttons on the left edge of the map, centred vertically, top to bottom: Madinah (the courtyard umbrella, from the owner's reference), Makkah (the Kaabah as a simple cube, drawn without a reference) and Umrah (a pilgrim in ihram, from the owner's reference). Papercut look only. See `.side-rail`, `goCity` and `openUmrah` in `src/App.tsx`.
+- Madinah and Makkah fly like the arrows (Makkah = the opening view) and turn gold while that city is in view. Umrah flies to the Masjid al-Haram view, where the step pins are, and sets the sheet's bar to "Umrah in seven steps"; the sheet stays closed.
+- The Umrah icon shows a human figure, against the "never render an image of a person" rule. It was drawn because the owner sent it as the reference; the owner has been asked to confirm.

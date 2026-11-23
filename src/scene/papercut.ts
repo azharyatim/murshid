@@ -66,8 +66,9 @@ export const PAPER_STAGES = {
   patchFull: 26_000,
   footStart: 36_000, // flat footprints start to fade in
   footFull: 11_000,
-  growStart: 3_500, // buildings start rising (3% height)...
-  growEnd: 1_450, // ...and reach full height
+  // Owner, 20 Nov 2026: full height by the 2.4 km Masjid al-Haram view (was 3.5 to 1.45 km).
+  growStart: 4_800, // buildings start rising (3% height)...
+  growEnd: 2_500, // ...and reach full height
 };
 
 export const smoothstep = (a: number, b: number, x: number) => {

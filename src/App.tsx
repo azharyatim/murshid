@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CityScene, type Look, type PaperStage, type Pin } from './scene/CityScene';
+import { easeOutQuint, CityScene, type Look, type PaperStage, type Pin } from './scene/CityScene';
 import {
   CLAY,
   CLAY_CYAN,
@@ -30,6 +30,23 @@ const PLACES: { name: string; pos: [number, number] }[] = [
 ];
 
 // With the regional map, which pins show depends on how far out the view is (metres).
+/** How long the Makkah and Madinah arrows take to fly between the cities. */
+const CITY_FLIGHT_SECONDS = 3.6;
+/** The Makkah and Madinah arrows' flight between the cities (owner, 20 Nov 2026). */
+const ARROW_FLIGHT_SECONDS = 2;
+/** The same flight starting from a mosque view (closer than 10 km), which has further to climb. */
+const MOSQUE_TO_CITY_SECONDS = 3;
+/** The Masjid al-Nabawi view: camera distance, and where the mosque's dot sits (fraction of the way down). */
+const NABAWI_VIEW_DISTANCE = 1500;
+const NABAWI_DOT_Y = 0.356;
+/** The opening zoom-in, from twice as far out to the opening view, once the map has loaded. */
+const INTRO_SECONDS = 2.4;
+/** The Masjid al-Haram view: camera distance, and how long the zoom in takes. */
+const HARAM_VIEW_DISTANCE = 2400;
+const HARAM_FLIGHT_SECONDS = 3;
+/** Where the Clock Tower's top sits in that view: this fraction of the way down the map. */
+// Owner: the spire may touch the top edge. 0.017 = 50 px lower than the earlier -0.04 on a 390 x 844 phone (map area 763 px).
+const CLOCK_TOWER_TOP = 0.017;
 const CITY_VIEW = 60_000; // further out than this: only city names (and Badr)
 
 /* Side-rail icons, line drawings in the style of the owner's references. */
@@ -153,8 +170,8 @@ const REAL_CITY = ['cyan-light', 'green', 'cyan-grey', 'clay-grey', 'day', 'pape
 export function App() {
   const [selected, setSelected] = useState<number | null>(null);
   const [placeId, setPlaceId] = useState<string | null>(null);
-  // The bottom sheet starts collapsed (owner's request) so the map gets the room;
-  // choosing a step or a place opens it.
+  // The bottom sheet starts collapsed and stays collapsed (owner, 20 Nov 2026): choosing a
+  // step or a place only updates its bar; only tapping the bar opens it.
   const [sheetOpen, setSheetOpen] = useState(false);
   // The miqat view (from the "At the miqat" chip): the five miqats on the region map.
   const [miqatMode, setMiqatMode] = useState(false);
@@ -166,12 +183,28 @@ export function App() {
   const [paperStage, setPaperStage] = useState<PaperStage | null>(null);
   const sceneRef = useRef<CityScene | null>(null);
   const pinEls = useRef(new Map<string, HTMLElement>());
+  const madinahArrowRef = useRef<HTMLButtonElement>(null);
+  const makkahArrowRef = useRef<HTMLButtonElement>(null);
+  // The loading screen stays until the opening view's map has been drawn.
+  const [mapReady, setMapReady] = useState(false);
+  const readyRef = useRef(false);
 
   const [city, setCity] = useState<CityData | null>(null);
   const [cityError, setCityError] = useState(false);
   // The regional map and Madinah. If they fail to load, the app falls back to Makkah alone.
   const [regional, setRegional] = useState<{ region: RegionData; madinah: CityData | null } | null>(null);
   const [regionTried, setRegionTried] = useState(false);
+
+  // Never leave the loading screen up for good if a download stalls.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      // Only if the map never reported ready: otherwise this would pull the camera away.
+      if (readyRef.current) return;
+      setMapReady(true);
+      if (PAPER) sceneRef.current?.cityView(0, true, INTRO_SECONDS);
+    }, 20_000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (!REAL_CITY) return;
@@ -223,6 +256,18 @@ export function App() {
       });
     }
     scene.setPins(pins);
+    if (PAPER && regionNow?.madinah) {
+      const at = (id: string) => sitePos(SITES.find((s) => s.id === id)!);
+      scene.setPointers([
+        { el: madinahArrowRef.current, pos: at('nabawi') },
+        { el: makkahArrowRef.current, pos: at('haram') },
+      ]);
+    }
+    scene.onReady = () => {
+      readyRef.current = true;
+      setMapReady(true);
+      if (PAPER) scene.cityView(0, true, INTRO_SECONDS);
+    };
     sceneRef.current = scene;
     // Test builds only: lets automated tests read the camera. Not in the preview or the app.
     if (import.meta.env.DEV) (window as unknown as { __scene: CityScene }).__scene = scene;
@@ -235,9 +280,12 @@ export function App() {
     };
   }, [city, cityError, regional, regionTried]);
 
+  /** Between the cities: 2 s from a city view, 3 s from a mosque view (owner, 20 Nov 2026). */
+  const betweenCitiesSeconds = () =>
+    (sceneRef.current?.debugView().distance ?? Infinity) < 10_000 ? MOSQUE_TO_CITY_SECONDS : ARROW_FLIGHT_SECONDS;
+
   const choose = (n: number | null) => {
     setSelected(n);
-    if (n !== null) setSheetOpen(true);
     setMiqatMode(false);
     setPlaceId(null);
     const step = STEPS.find((s) => s.n === n);
@@ -246,9 +294,36 @@ export function App() {
     setTilted(Boolean(step?.pos));
   };
 
+  /** The Masjid al-Haram view (owner, 20 Nov 2026): 2.4 km out, looking towards the
+   * Clock Towers, centred across and as high on the screen as they fit; a slow, gentle finish.
+   * The top of the tallest building (the Clock Tower's spire) sits just below the top edge. */
+  const haramView = () => {
+    if (!city?.landmarks.towers) return;
+    const top = Math.max(...city.buildings.map((b) => b.h));
+    sceneRef.current?.focusFacing(toScene([0, 0]), toScene(city.landmarks.towers), top, HARAM_VIEW_DISTANCE, 0.85, CLOCK_TOWER_TOP, HARAM_FLIGHT_SECONDS, easeOutQuint);
+  };
+
+  /** Side icons (owner, 23 Nov 2026). Madinah and Makkah: the same flights as the arrows
+   * (Makkah is the opening view, as the reset button). */
+  const goCity = (target: 0 | 1) => {
+    const here = paperStage ? paperStage.cityDistance <= CITY_VIEW && paperStage.nearest === target : false;
+    sceneRef.current?.cityView(target, true, here ? CITY_FLIGHT_SECONDS : betweenCitiesSeconds());
+    setSheetOpen(false);
+    setTilted(false);
+  };
+
+  /** Umrah icon: the Masjid al-Haram view, where the step pins are, with the sheet's bar
+   * showing the seven steps. The sheet stays closed (owner, 20 Nov 2026). */
+  const openUmrah = () => {
+    setSelected(null);
+    setPlaceId(null);
+    setMiqatMode(false);
+    haramView();
+    setTilted(true);
+  };
+
   const choosePlace = (p: Place) => {
     setSelected(null);
-    setSheetOpen(true);
     if (p.kind !== 'miqat') setMiqatMode(false);
     setPlaceId(p.id);
     if (p.kind === 'miqat') {
@@ -257,29 +332,36 @@ export function App() {
       setTilted(false);
       return;
     }
-    sceneRef.current?.focus(sitePos(p), focusDistance(p));
+    if (p.id === 'haram' && PAPER && city?.landmarks.towers) {
+      haramView();
+    } else if (p.id === 'nabawi') {
+      // A slower approach to the Prophet's Mosque, settling gently, with the Green Dome
+      // centred across the screen (owner, 20 Nov 2026).
+      // No turn (owner, 20 Nov 2026): keep the map's current compass direction. The
+      // mosque's dot sits centred across the screen (owner, 21 Nov 2026), at the same
+      // height as before (a third of the way down).
+      const scene = sceneRef.current;
+      if (PAPER && scene) {
+        const az = scene.debugView().azimuth;
+        const dot = sitePos(p);
+        const from: [number, number] = [dot[0] + Math.sin(az) * 100, dot[1] + Math.cos(az) * 100];
+        scene.focusFacing(from, dot, 0, NABAWI_VIEW_DISTANCE, 0.85, NABAWI_DOT_Y, HARAM_FLIGHT_SECONDS, easeOutQuint);
+      }
+      else sceneRef.current?.focus(sitePos(p), focusDistance(p), HARAM_FLIGHT_SECONDS, easeOutQuint);
+    } else {
+      sceneRef.current?.focus(sitePos(p), focusDistance(p));
+    }
     setTilted(true);
   };
 
-  /** The "At the miqat" chip: steps 1 and 2, and (with the regional map) the five miqats framed. */
+  /** Steps 1 and 2 (from the sheet): and (with the regional map) the five miqats framed. */
   const openMiqats = () => {
     if (!showRegion) return choose(MIQAT_STEPS[0].n);
     setSelected(MIQAT_STEPS[0].n);
     setPlaceId(null);
-    setSheetOpen(true);
     setMiqatMode(true);
     sceneRef.current?.frame(MIQATS.map(sitePos));
     setTilted(false);
-  };
-
-  /** The Umrah icon: go to Makkah, where the step pins are, and open the seven steps. */
-  const openUmrah = () => {
-    setSelected(null);
-    setPlaceId(null);
-    setMiqatMode(false);
-    setSheetOpen(true);
-    sceneRef.current?.jumpTo(0);
-    setTilted(true);
   };
 
   /** Tapping a city name zooms to the whole city, looking straight down. */
@@ -423,21 +505,6 @@ export function App() {
           ))}
         </div>
 
-        <button
-          type="button"
-          className={`miqat${MIQAT_STEPS.some((s) => s.n === selected) ? ' is-on' : ''}`}
-          onClick={openMiqats}
-        >
-          <span className="miqat-nums" aria-hidden="true">
-            {MIQAT_STEPS.map((s) => (
-              <i key={s.n}>{s.n}</i>
-            ))}
-          </span>
-          <span>
-            <span className="sr-only">Steps 1 and 2: </span>At the miqat, before Makkah
-          </span>
-        </button>
-
         {PAPER && (
           // Owner's request (23 Nov 2026): Madinah, Makkah, Umrah, left edge, centred.
           <nav className="side-rail" aria-label="Go to">
@@ -447,7 +514,7 @@ export function App() {
             ]).map(({ name, target, icon }) => {
               const on = paperStage ? paperStage.cityDistance <= CITY_VIEW && paperStage.nearest === target : false;
               return (
-                <button key={name} type="button" className={on ? 'is-on' : ''} aria-label={name} aria-pressed={on} title={name} onClick={() => sceneRef.current?.jumpTo(target)}>
+                <button key={name} type="button" className={on ? 'is-on' : ''} aria-label={name} aria-pressed={on} title={name} onClick={() => goCity(target)}>
                   {icon}
                 </button>
               );
@@ -459,13 +526,19 @@ export function App() {
         )}
 
         <div className="map-controls" role="group" aria-label="Map controls">
-          <button type="button" aria-label="Zoom in" onClick={() => sceneRef.current?.zoomBy(0.7)}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-          </button>
-          <button type="button" aria-label="Zoom out" onClick={() => sceneRef.current?.zoomBy(1 / 0.7)}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /></svg>
-          </button>
-          <button type="button" aria-label="Rotate the map" onClick={() => sceneRef.current?.rotateBy(Math.PI / 4)}>
+          {/* Resets to the opening view (owner, 20 Nov 2026); it used to rotate the map. */}
+          <button
+            type="button"
+            aria-label="Back to the opening view"
+            onClick={() => {
+              // The same slow flight as the city arrows (owner, 20 Nov 2026).
+              // From Madinah this is a flight between the cities, timed like the arrows.
+              if (PAPER) sceneRef.current?.cityView(0, true, paperStage?.nearest === 1 ? betweenCitiesSeconds() : CITY_FLIGHT_SECONDS);
+              else sceneRef.current?.showAll();
+              setTilted(false);
+              setSheetOpen(false);
+            }}
+          >
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.3-5.2M19 4v4h-4" /></svg>
           </button>
           <button
@@ -494,24 +567,60 @@ export function App() {
               {keyOpen ? 'Hide key' : 'Key'}
             </button>
           </div>
-          <div className="paper-jump" role="group" aria-label="Jump to">
-            {(['region', 0, 1] as const).map((t) => {
-              const name = t === 'region' ? 'Region' : t === 0 ? 'Makkah' : 'Madinah';
-              // The current place: the nearest city once within 60 km, otherwise the region.
-              const on = paperStage ? (paperStage.cityDistance > CITY_VIEW ? t === 'region' : t === paperStage.nearest) : t === 'region';
-              return (
-                <button key={name} type="button" className={on ? 'is-on' : ''} aria-pressed={on} onClick={() => sceneRef.current?.jumpTo(t)}>
-                  {name}
-                </button>
-              );
-            })}
-          </div>
           {paperStage && (
             // TEMPORARY, for the owner's reference while tuning: zoom distance, stage and frame rate.
             <p className="paper-readout" aria-live="off">
               {formatDistance(paperStage.distance)} · {paperStage.level} · {paperStage.fps === null ? 'still' : `${paperStage.fps} fps`}
             </p>
           )}
+          </div>
+        )}
+
+        {PAPER &&
+          regional?.madinah &&
+          // Each arrow points to its city from wherever the map is, while that city is off screen.
+          (
+            [
+              { name: 'Madinah', ref: madinahArrowRef, city: 1 },
+              { name: 'Makkah', ref: makkahArrowRef, city: 0 },
+            ] as const
+          ).map((a) => (
+            <button
+              key={a.name}
+              ref={a.ref}
+              type="button"
+              className="dir-arrow"
+              style={{ visibility: 'hidden' }}
+              onClick={() => {
+                // A slower, eased flight between the cities (owner, 20 Nov 2026).
+                sceneRef.current?.cityView(a.city, true, betweenCitiesSeconds());
+                setSheetOpen(false);
+                setTilted(false);
+              }}
+            >
+              {/* Floats: the arrow and its name bob gently along the arrow's direction. */}
+              <span className="dir-arrow-bob">
+                <span className="dir-arrow-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M21 12 4 4.5l4.2 7.5L4 19.5Z" />
+                  </svg>
+                </span>
+                <span className="dir-arrow-label">
+                  <span className="sr-only">Go to </span>
+                  {a.name}
+                </span>
+              </span>
+            </button>
+          ))}
+
+        {!mapReady && (
+          <div className="map-loading" role="status">
+            <div className="map-loading-paper" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </div>
+            <p>Loading the map</p>
           </div>
         )}
 
@@ -591,7 +700,8 @@ export function App() {
                   className={selected === s.n ? 'is-on' : ''}
                   aria-label={`Step ${s.n}: ${s.title}`}
                   aria-pressed={selected === s.n}
-                  onClick={() => choose(s.n)}
+                  // The "At the miqat" chip was removed (owner, 20 Nov 2026), so steps 1 and 2 open the miqat view.
+                  onClick={() => (MIQAT_STEPS.some((m) => m.n === s.n) ? openMiqats() : choose(s.n))}
                 >
                   {s.n}
                 </button>

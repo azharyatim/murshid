@@ -32,6 +32,34 @@ const PLACES: { name: string; pos: [number, number] }[] = [
 // With the regional map, which pins show depends on how far out the view is (metres).
 const CITY_VIEW = 60_000; // further out than this: only city names (and Badr)
 
+/* Side-rail icons, line drawings in the style of the owner's references. */
+const ICON_MADINAH = (
+  // The umbrella of the Prophet's Mosque courtyard (owner's reference).
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M2 6.5 Q7 3.5 12 3.5 Q17 3.5 22 6.5" />
+    <path d="M2 6.5 Q4 10 7 9.6 Q9.5 11.2 12 10.4 Q14.5 11.2 17 9.6 Q20 10 22 6.5" />
+    <path d="M2 6.5 L10 8.6 M22 6.5 L14 8.6 M7 9.6 L10.5 9 M17 9.6 L13.5 9 M7 4.4 L10.5 7.6 M17 4.4 L13.5 7.6" />
+    <ellipse cx="12" cy="8.4" rx="2.4" ry="1.1" />
+    <path d="M12 9.5 V21 M10.5 21 H13.5" />
+  </svg>
+);
+const ICON_MAKKAH = (
+  // The Kaabah as a simple cube with the band of its cover.
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 7.5 L12 4.5 L20 7.5 V17.5 L12 20.5 L4 17.5 Z" />
+    <path d="M4 7.5 L12 10.5 L20 7.5 M12 10.5 V20.5" />
+    <path d="M4 10 L12 13 L20 10" />
+  </svg>
+);
+const ICON_UMRAH = (
+  // A pilgrim in ihram, the cloth over the left shoulder (owner's reference).
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="7" r="3.3" />
+    <path d="M4.5 21 V17.5 Q4.5 12.5 12 12.5 Q19.5 12.5 19.5 17.5 V21" />
+    <path d="M8 13.2 L19.5 19 M5.2 15.6 L15.5 21" />
+  </svg>
+);
+
 /** Papercut: the legend's colours (the owner's). */
 const PAPER_LEGEND = [
   { name: 'Hotels', colour: PAPER_OWNER.hotel },
@@ -244,6 +272,16 @@ export function App() {
     setTilted(false);
   };
 
+  /** The Umrah icon: go to Makkah, where the step pins are, and open the seven steps. */
+  const openUmrah = () => {
+    setSelected(null);
+    setPlaceId(null);
+    setMiqatMode(false);
+    setSheetOpen(true);
+    sceneRef.current?.jumpTo(0);
+    setTilted(true);
+  };
+
   /** Tapping a city name zooms to the whole city, looking straight down. */
   const openCity = (placeId: string) => {
     const p = SITES.find((s) => s.id === placeId)!;
@@ -399,6 +437,26 @@ export function App() {
             <span className="sr-only">Steps 1 and 2: </span>At the miqat, before Makkah
           </span>
         </button>
+
+        {PAPER && (
+          // Owner's request (23 Nov 2026): Madinah, Makkah, Umrah, left edge, centred.
+          <nav className="side-rail" aria-label="Go to">
+            {([
+              { name: 'Madinah', target: 1 as const, icon: ICON_MADINAH },
+              { name: 'Makkah', target: 0 as const, icon: ICON_MAKKAH },
+            ]).map(({ name, target, icon }) => {
+              const on = paperStage ? paperStage.cityDistance <= CITY_VIEW && paperStage.nearest === target : false;
+              return (
+                <button key={name} type="button" className={on ? 'is-on' : ''} aria-label={name} aria-pressed={on} title={name} onClick={() => sceneRef.current?.jumpTo(target)}>
+                  {icon}
+                </button>
+              );
+            })}
+            <button type="button" aria-label="Umrah steps" title="Umrah" onClick={openUmrah}>
+              {ICON_UMRAH}
+            </button>
+          </nav>
+        )}
 
         <div className="map-controls" role="group" aria-label="Map controls">
           <button type="button" aria-label="Zoom in" onClick={() => sceneRef.current?.zoomBy(0.7)}>

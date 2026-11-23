@@ -674,3 +674,41 @@ h1 {
 .pins.miqat-mode > :not(.is-miqat):not(.keep-in-miqat) {
   display: none;
 }
+
+/* Side rail: Madinah, Makkah, Umrah (owner's request, 23 Nov 2026). Left edge, centred on the map. */
+.side-rail {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.side-rail button {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--sheet);
+  color: var(--ink);
+}
+
+.side-rail button.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.side-rail svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

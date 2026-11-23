@@ -214,6 +214,13 @@ Adopted from branch `claude/hopeful-heisenberg-a1p880` (not merged; reference co
 - **Middle ring (owner, 20 Nov 2026):** each city also has a 32 km ground patch with 62.5 m cells (`terrain-makkah-mid.png`, `terrain-madinah-mid.png`, about 110 KB together), fading in from 170 to 70 km, under the sharp 8 km patch. Views of about 10 to 40 km are now crisp; the hand-over to the region map shows as a soft blend around 70 to 120 km.
 - **Known limits:** the region ground is 145 m per cell, so beyond the middle ring (more than about 16 km from a city) it still looks stepped; frame rate not measured on a real phone.
 
+## Side icons: Madinah, Makkah, Umrah (owner, 23 Nov 2026)
+
+Three icon buttons on the left edge of the map, centred vertically, top to bottom: Madinah (the courtyard umbrella, from the owner's reference), Makkah (the Kaabah as a simple cube, drawn without a reference) and Umrah (a pilgrim in ihram, from the owner's reference). Madinah and Makkah fly to that city's 3D view, like the jump buttons, and turn gold while you are there. Umrah flies to Makkah and opens the panel with the seven steps. Papercut look only. See `.side-rail` in `src/App.tsx` and `src/styles.css`.
+
+- The Umrah icon shows a human figure, which goes against the "never render an image of a person" rule above. It was drawn because the owner sent it as the reference, and they were asked to confirm it.
+- The Makkah and Madinah jump buttons at the bottom left now do the same as two of the icons. Whether to keep both is the owner's call.
+
 ## Later feature ideas from the owner (not scheduled)
 
 - **Hotels.** Colour hotels differently, and let a pilgrim find their own hotel and see the walking route to the Haram. In the current export 158 of 413 outlines are tagged as hotels (127 named); unmarked buildings may be hotels too, so this must be labelled as incomplete.

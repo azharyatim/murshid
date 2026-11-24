@@ -903,7 +903,9 @@ export class CityScene {
   private updatePointer(ptr: { el: HTMLElement; pos: [number, number] }, w: number, h: number) {
     const v = this.tmp.set(ptr.pos[0], 0, ptr.pos[1]).project(this.camera);
     const onScreen = v.z < 1 && Math.abs(v.x) < 0.9 && Math.abs(v.y) < 0.9;
-    if (onScreen) {
+    // No arrow to the other city in the mosque views (owner, 24 Nov 2026): closer than
+    // 10 km, the same line App.tsx uses to tell a mosque view from a city view.
+    if (onScreen || this.distance() < 10_000) {
       ptr.el.style.visibility = 'hidden';
       return;
     }
